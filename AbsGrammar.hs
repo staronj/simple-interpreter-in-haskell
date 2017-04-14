@@ -31,33 +31,33 @@ type Boolean = Tree Boolean_
 data Tree :: Tag -> * where
     LiteralBool :: Boolean -> Tree Literal_
     LiteralI32 :: Integer -> Tree Literal_
-    ExprAssign :: Expr -> Expr -> Tree Expr_
-    ExprOr :: Expr -> Expr -> Tree Expr_
-    ExprAnd :: Expr -> Expr -> Tree Expr_
-    ExprEq :: Expr -> Expr -> Tree Expr_
-    ExprNotEq :: Expr -> Expr -> Tree Expr_
-    ExprLess :: Expr -> Expr -> Tree Expr_
-    ExprAdd :: Expr -> Expr -> Tree Expr_
-    ExprSub :: Expr -> Expr -> Tree Expr_
-    ExprMul :: Expr -> Expr -> Tree Expr_
-    ExprDiv :: Expr -> Expr -> Tree Expr_
-    ExprMod :: Expr -> Expr -> Tree Expr_
-    ExprNeg :: Expr -> Tree Expr_
-    ExprDeref :: Expr -> Tree Expr_
-    ExprNot :: Expr -> Tree Expr_
-    ExprBorrow :: Expr -> Tree Expr_
-    ExprMutBorrow :: Expr -> Tree Expr_
-    ExprLiteral :: Literal -> Tree Expr_
+    Assign :: Expr -> Expr -> Tree Expr_
+    Or :: Expr -> Expr -> Tree Expr_
+    And :: Expr -> Expr -> Tree Expr_
+    Equal :: Expr -> Expr -> Tree Expr_
+    NotEqual :: Expr -> Expr -> Tree Expr_
+    Less :: Expr -> Expr -> Tree Expr_
+    Add :: Expr -> Expr -> Tree Expr_
+    Subtract :: Expr -> Expr -> Tree Expr_
+    Multiply :: Expr -> Expr -> Tree Expr_
+    Divide :: Expr -> Expr -> Tree Expr_
+    Modulo :: Expr -> Expr -> Tree Expr_
+    Negate :: Expr -> Tree Expr_
+    Dereference :: Expr -> Tree Expr_
+    Not :: Expr -> Tree Expr_
+    Borrow :: Expr -> Tree Expr_
+    MutableBorrow :: Expr -> Tree Expr_
+    LiteralExpr :: Literal -> Tree Expr_
     ExprIdent :: Ident -> Tree Expr_
-    ExprCall :: Ident -> SepExprList -> Tree Expr_
-    ExprArrayLookup :: Expr -> Expr -> Tree Expr_
-    ExprTupleLookup :: Expr -> Integer -> Tree Expr_
-    ExprIfElse :: IfElse -> Tree Expr_
-    ExprBlock :: Block -> Tree Expr_
-    ExprArrayElems :: MarkExprList -> Tree Expr_
-    ExprArrayRepeat :: Expr -> Integer -> Tree Expr_
-    ExprArrayRange :: Integer -> Integer -> Tree Expr_
-    ExprTuple :: MarkExprList -> Tree Expr_
+    FunctionCall :: Ident -> SepExprList -> Tree Expr_
+    ArrayLookup :: Expr -> Expr -> Tree Expr_
+    TupleLookup :: Expr -> Integer -> Tree Expr_
+    IfElseExpr :: IfElse -> Tree Expr_
+    BlockExpr :: Block -> Tree Expr_
+    ArrayElements :: MarkExprList -> Tree Expr_
+    ArrayRepeat :: Expr -> Integer -> Tree Expr_
+    ArrayRange :: Integer -> Integer -> Tree Expr_
+    TupleConstruct :: MarkExprList -> Tree Expr_
     SepExprNil :: Tree SepExprList_
     SepExprOne :: Expr -> Tree SepExprList_
     SepExprMore :: Expr -> SepExprList -> Tree SepExprList_
@@ -68,21 +68,21 @@ data Tree :: Tag -> * where
     MarkExprMore :: Expr -> MarkExprList -> Tree MarkExprList_
     MarkExprHead :: Expr -> Tree MarkExprList_
     MarkExprTail :: MarkExprList -> Expr -> Tree MarkExprList_
-    TypeBool :: Tree Type_
-    TypeI32 :: Tree Type_
-    TypeRef :: Type -> Tree Type_
-    TypeMutRef :: Type -> Tree Type_
-    TypeArray :: Type -> Integer -> Tree Type_
-    TypeTuple :: MarkTypeList -> Tree Type_
+    Bool :: Tree Type_
+    I32 :: Tree Type_
+    Reference :: Type -> Tree Type_
+    MutableReference :: Type -> Tree Type_
+    Array :: Type -> Integer -> Tree Type_
+    Tuple :: MarkTypeList -> Tree Type_
     MarkTNil :: Tree MarkTypeList_
     MarkTOne :: Type -> Tree MarkTypeList_
     MarkTMore :: Type -> MarkTypeList -> Tree MarkTypeList_
     MarkTHead :: Type -> Tree MarkTypeList_
     MarkTTail :: MarkTypeList -> Type -> Tree MarkTypeList_
-    PatternIdent :: Ident -> Tree LetPattern_
-    PatternMutIdent :: Ident -> Tree LetPattern_
-    PatternIgnore :: Tree LetPattern_
-    PatternTuple :: MarkLetPatternList -> Tree LetPattern_
+    LetPatternVariable :: Ident -> Tree LetPattern_
+    LetPatternMutableVariable :: Ident -> Tree LetPattern_
+    LetPatternIgnore :: Tree LetPattern_
+    LetPatternTuple :: MarkLetPatternList -> Tree LetPattern_
     MarkPatternNil :: Tree MarkLetPatternList_
     MarkPatternOne :: LetPattern -> Tree MarkLetPatternList_
     MarkPatternMore :: LetPattern -> MarkLetPatternList -> Tree MarkLetPatternList_
@@ -98,20 +98,21 @@ data Tree :: Tag -> * where
     SepPTail :: SepParameterList -> Parameter -> Tree SepParameterList_
     IfElse :: Expr -> Block -> Block -> Tree IfElse_
     IfStmt :: Expr -> Block -> Tree IfStmt_
-    StmtFnDecl :: FunDecl -> Tree Stmt_
-    StmtExpr :: Expr -> Tree Stmt_
-    StmtBreak :: Tree Stmt_
-    StmtContinue :: Tree Stmt_
-    StmtIf :: IfStmt -> Tree Stmt_
-    StmtIfElse :: IfElse -> Tree Stmt_
-    StmtLoop :: Block -> Tree Stmt_
-    StmtWhile :: Expr -> Block -> Tree Stmt_
-    StmtForIterable :: Ident -> Expr -> Block -> Tree Stmt_
-    StmtForRange :: Ident -> Expr -> Expr -> Block -> Tree Stmt_
-    StmtLetType :: LetPattern -> Type -> Expr -> Tree Stmt_
-    StmtLet :: LetPattern -> Expr -> Tree Stmt_
-    BlockStmt :: [Stmt] -> Tree Block_
-    BlockExpr :: [Stmt] -> Expr -> Tree Block_
+    FunDeclStmt :: FunDecl -> Tree Stmt_
+    Stmt :: Expr -> Tree Stmt_
+    Break :: Tree Stmt_
+    Continue :: Tree Stmt_
+    If :: IfStmt -> Tree Stmt_
+    IfElseStmt :: IfElse -> Tree Stmt_
+    Loop :: Block -> Tree Stmt_
+    While :: Expr -> Block -> Tree Stmt_
+    IterableForLoop :: Ident -> Expr -> Block -> Tree Stmt_
+    RangeForLoop :: Ident -> Expr -> Expr -> Block -> Tree Stmt_
+    LetStmtStrict :: LetPattern -> Type -> Expr -> Tree Stmt_
+    LetStmt :: LetPattern -> Expr -> Tree Stmt_
+    BlockStmt :: Block -> Tree Stmt_
+    Block :: [Stmt] -> Tree Block_
+    BlockWithValue :: [Stmt] -> Expr -> Tree Block_
     Program :: [FunDecl] -> Tree Program_
     Ident :: String -> Tree Ident_
     Boolean :: String -> Tree Boolean_
@@ -119,32 +120,32 @@ data Tree :: Tag -> * where
 instance Compos Tree where
   compos r a f t = case t of
       LiteralBool boolean -> r LiteralBool `a` f boolean
-      ExprAssign expr0 expr1 -> r ExprAssign `a` f expr0 `a` f expr1
-      ExprOr expr0 expr1 -> r ExprOr `a` f expr0 `a` f expr1
-      ExprAnd expr0 expr1 -> r ExprAnd `a` f expr0 `a` f expr1
-      ExprEq expr0 expr1 -> r ExprEq `a` f expr0 `a` f expr1
-      ExprNotEq expr0 expr1 -> r ExprNotEq `a` f expr0 `a` f expr1
-      ExprLess expr0 expr1 -> r ExprLess `a` f expr0 `a` f expr1
-      ExprAdd expr0 expr1 -> r ExprAdd `a` f expr0 `a` f expr1
-      ExprSub expr0 expr1 -> r ExprSub `a` f expr0 `a` f expr1
-      ExprMul expr0 expr1 -> r ExprMul `a` f expr0 `a` f expr1
-      ExprDiv expr0 expr1 -> r ExprDiv `a` f expr0 `a` f expr1
-      ExprMod expr0 expr1 -> r ExprMod `a` f expr0 `a` f expr1
-      ExprNeg expr -> r ExprNeg `a` f expr
-      ExprDeref expr -> r ExprDeref `a` f expr
-      ExprNot expr -> r ExprNot `a` f expr
-      ExprBorrow expr -> r ExprBorrow `a` f expr
-      ExprMutBorrow expr -> r ExprMutBorrow `a` f expr
-      ExprLiteral literal -> r ExprLiteral `a` f literal
+      Assign expr0 expr1 -> r Assign `a` f expr0 `a` f expr1
+      Or expr0 expr1 -> r Or `a` f expr0 `a` f expr1
+      And expr0 expr1 -> r And `a` f expr0 `a` f expr1
+      Equal expr0 expr1 -> r Equal `a` f expr0 `a` f expr1
+      NotEqual expr0 expr1 -> r NotEqual `a` f expr0 `a` f expr1
+      Less expr0 expr1 -> r Less `a` f expr0 `a` f expr1
+      Add expr0 expr1 -> r Add `a` f expr0 `a` f expr1
+      Subtract expr0 expr1 -> r Subtract `a` f expr0 `a` f expr1
+      Multiply expr0 expr1 -> r Multiply `a` f expr0 `a` f expr1
+      Divide expr0 expr1 -> r Divide `a` f expr0 `a` f expr1
+      Modulo expr0 expr1 -> r Modulo `a` f expr0 `a` f expr1
+      Negate expr -> r Negate `a` f expr
+      Dereference expr -> r Dereference `a` f expr
+      Not expr -> r Not `a` f expr
+      Borrow expr -> r Borrow `a` f expr
+      MutableBorrow expr -> r MutableBorrow `a` f expr
+      LiteralExpr literal -> r LiteralExpr `a` f literal
       ExprIdent ident -> r ExprIdent `a` f ident
-      ExprCall ident sepexprlist -> r ExprCall `a` f ident `a` f sepexprlist
-      ExprArrayLookup expr0 expr1 -> r ExprArrayLookup `a` f expr0 `a` f expr1
-      ExprTupleLookup expr integer -> r ExprTupleLookup `a` f expr `a` r integer
-      ExprIfElse ifelse -> r ExprIfElse `a` f ifelse
-      ExprBlock block -> r ExprBlock `a` f block
-      ExprArrayElems markexprlist -> r ExprArrayElems `a` f markexprlist
-      ExprArrayRepeat expr integer -> r ExprArrayRepeat `a` f expr `a` r integer
-      ExprTuple markexprlist -> r ExprTuple `a` f markexprlist
+      FunctionCall ident sepexprlist -> r FunctionCall `a` f ident `a` f sepexprlist
+      ArrayLookup expr0 expr1 -> r ArrayLookup `a` f expr0 `a` f expr1
+      TupleLookup expr integer -> r TupleLookup `a` f expr `a` r integer
+      IfElseExpr ifelse -> r IfElseExpr `a` f ifelse
+      BlockExpr block -> r BlockExpr `a` f block
+      ArrayElements markexprlist -> r ArrayElements `a` f markexprlist
+      ArrayRepeat expr integer -> r ArrayRepeat `a` f expr `a` r integer
+      TupleConstruct markexprlist -> r TupleConstruct `a` f markexprlist
       SepExprOne expr -> r SepExprOne `a` f expr
       SepExprMore expr sepexprlist -> r SepExprMore `a` f expr `a` f sepexprlist
       SepExprHead expr -> r SepExprHead `a` f expr
@@ -153,17 +154,17 @@ instance Compos Tree where
       MarkExprMore expr markexprlist -> r MarkExprMore `a` f expr `a` f markexprlist
       MarkExprHead expr -> r MarkExprHead `a` f expr
       MarkExprTail markexprlist expr -> r MarkExprTail `a` f markexprlist `a` f expr
-      TypeRef type' -> r TypeRef `a` f type'
-      TypeMutRef type' -> r TypeMutRef `a` f type'
-      TypeArray type' integer -> r TypeArray `a` f type' `a` r integer
-      TypeTuple marktypelist -> r TypeTuple `a` f marktypelist
+      Reference type' -> r Reference `a` f type'
+      MutableReference type' -> r MutableReference `a` f type'
+      Array type' integer -> r Array `a` f type' `a` r integer
+      Tuple marktypelist -> r Tuple `a` f marktypelist
       MarkTOne type' -> r MarkTOne `a` f type'
       MarkTMore type' marktypelist -> r MarkTMore `a` f type' `a` f marktypelist
       MarkTHead type' -> r MarkTHead `a` f type'
       MarkTTail marktypelist type' -> r MarkTTail `a` f marktypelist `a` f type'
-      PatternIdent ident -> r PatternIdent `a` f ident
-      PatternMutIdent ident -> r PatternMutIdent `a` f ident
-      PatternTuple markletpatternlist -> r PatternTuple `a` f markletpatternlist
+      LetPatternVariable ident -> r LetPatternVariable `a` f ident
+      LetPatternMutableVariable ident -> r LetPatternMutableVariable `a` f ident
+      LetPatternTuple markletpatternlist -> r LetPatternTuple `a` f markletpatternlist
       MarkPatternOne letpattern -> r MarkPatternOne `a` f letpattern
       MarkPatternMore letpattern markletpatternlist -> r MarkPatternMore `a` f letpattern `a` f markletpatternlist
       MarkPatternHead letpattern -> r MarkPatternHead `a` f letpattern
@@ -177,18 +178,19 @@ instance Compos Tree where
       SepPTail sepparameterlist parameter -> r SepPTail `a` f sepparameterlist `a` f parameter
       IfElse expr block0 block1 -> r IfElse `a` f expr `a` f block0 `a` f block1
       IfStmt expr block -> r IfStmt `a` f expr `a` f block
-      StmtFnDecl fundecl -> r StmtFnDecl `a` f fundecl
-      StmtExpr expr -> r StmtExpr `a` f expr
-      StmtIf ifstmt -> r StmtIf `a` f ifstmt
-      StmtIfElse ifelse -> r StmtIfElse `a` f ifelse
-      StmtLoop block -> r StmtLoop `a` f block
-      StmtWhile expr block -> r StmtWhile `a` f expr `a` f block
-      StmtForIterable ident expr block -> r StmtForIterable `a` f ident `a` f expr `a` f block
-      StmtForRange ident expr0 expr1 block2 -> r StmtForRange `a` f ident `a` f expr0 `a` f expr1 `a` f block2
-      StmtLetType letpattern type' expr -> r StmtLetType `a` f letpattern `a` f type' `a` f expr
-      StmtLet letpattern expr -> r StmtLet `a` f letpattern `a` f expr
-      BlockStmt stmts -> r BlockStmt `a` foldr (a . a (r (:)) . f) (r []) stmts
-      BlockExpr stmts expr -> r BlockExpr `a` foldr (a . a (r (:)) . f) (r []) stmts `a` f expr
+      FunDeclStmt fundecl -> r FunDeclStmt `a` f fundecl
+      Stmt expr -> r Stmt `a` f expr
+      If ifstmt -> r If `a` f ifstmt
+      IfElseStmt ifelse -> r IfElseStmt `a` f ifelse
+      Loop block -> r Loop `a` f block
+      While expr block -> r While `a` f expr `a` f block
+      IterableForLoop ident expr block -> r IterableForLoop `a` f ident `a` f expr `a` f block
+      RangeForLoop ident expr0 expr1 block2 -> r RangeForLoop `a` f ident `a` f expr0 `a` f expr1 `a` f block2
+      LetStmtStrict letpattern type' expr -> r LetStmtStrict `a` f letpattern `a` f type' `a` f expr
+      LetStmt letpattern expr -> r LetStmt `a` f letpattern `a` f expr
+      BlockStmt block -> r BlockStmt `a` f block
+      Block stmts -> r Block `a` foldr (a . a (r (:)) . f) (r []) stmts
+      BlockWithValue stmts expr -> r BlockWithValue `a` foldr (a . a (r (:)) . f) (r []) stmts `a` f expr
       Program fundecls -> r Program `a` foldr (a . a (r (:)) . f) (r []) fundecls
       _ -> r t
 
@@ -196,33 +198,33 @@ instance Show (Tree c) where
   showsPrec n t = case t of
     LiteralBool boolean -> opar n . showString "LiteralBool" . showChar ' ' . showsPrec 1 boolean . cpar n
     LiteralI32 integer -> opar n . showString "LiteralI32" . showChar ' ' . showsPrec 1 integer . cpar n
-    ExprAssign expr0 expr1 -> opar n . showString "ExprAssign" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprOr expr0 expr1 -> opar n . showString "ExprOr" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprAnd expr0 expr1 -> opar n . showString "ExprAnd" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprEq expr0 expr1 -> opar n . showString "ExprEq" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprNotEq expr0 expr1 -> opar n . showString "ExprNotEq" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprLess expr0 expr1 -> opar n . showString "ExprLess" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprAdd expr0 expr1 -> opar n . showString "ExprAdd" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprSub expr0 expr1 -> opar n . showString "ExprSub" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprMul expr0 expr1 -> opar n . showString "ExprMul" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprDiv expr0 expr1 -> opar n . showString "ExprDiv" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprMod expr0 expr1 -> opar n . showString "ExprMod" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprNeg expr -> opar n . showString "ExprNeg" . showChar ' ' . showsPrec 1 expr . cpar n
-    ExprDeref expr -> opar n . showString "ExprDeref" . showChar ' ' . showsPrec 1 expr . cpar n
-    ExprNot expr -> opar n . showString "ExprNot" . showChar ' ' . showsPrec 1 expr . cpar n
-    ExprBorrow expr -> opar n . showString "ExprBorrow" . showChar ' ' . showsPrec 1 expr . cpar n
-    ExprMutBorrow expr -> opar n . showString "ExprMutBorrow" . showChar ' ' . showsPrec 1 expr . cpar n
-    ExprLiteral literal -> opar n . showString "ExprLiteral" . showChar ' ' . showsPrec 1 literal . cpar n
+    Assign expr0 expr1 -> opar n . showString "Assign" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    Or expr0 expr1 -> opar n . showString "Or" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    And expr0 expr1 -> opar n . showString "And" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    Equal expr0 expr1 -> opar n . showString "Equal" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    NotEqual expr0 expr1 -> opar n . showString "NotEqual" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    Less expr0 expr1 -> opar n . showString "Less" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    Add expr0 expr1 -> opar n . showString "Add" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    Subtract expr0 expr1 -> opar n . showString "Subtract" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    Multiply expr0 expr1 -> opar n . showString "Multiply" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    Divide expr0 expr1 -> opar n . showString "Divide" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    Modulo expr0 expr1 -> opar n . showString "Modulo" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    Negate expr -> opar n . showString "Negate" . showChar ' ' . showsPrec 1 expr . cpar n
+    Dereference expr -> opar n . showString "Dereference" . showChar ' ' . showsPrec 1 expr . cpar n
+    Not expr -> opar n . showString "Not" . showChar ' ' . showsPrec 1 expr . cpar n
+    Borrow expr -> opar n . showString "Borrow" . showChar ' ' . showsPrec 1 expr . cpar n
+    MutableBorrow expr -> opar n . showString "MutableBorrow" . showChar ' ' . showsPrec 1 expr . cpar n
+    LiteralExpr literal -> opar n . showString "LiteralExpr" . showChar ' ' . showsPrec 1 literal . cpar n
     ExprIdent ident -> opar n . showString "ExprIdent" . showChar ' ' . showsPrec 1 ident . cpar n
-    ExprCall ident sepexprlist -> opar n . showString "ExprCall" . showChar ' ' . showsPrec 1 ident . showChar ' ' . showsPrec 1 sepexprlist . cpar n
-    ExprArrayLookup expr0 expr1 -> opar n . showString "ExprArrayLookup" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
-    ExprTupleLookup expr integer -> opar n . showString "ExprTupleLookup" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 integer . cpar n
-    ExprIfElse ifelse -> opar n . showString "ExprIfElse" . showChar ' ' . showsPrec 1 ifelse . cpar n
-    ExprBlock block -> opar n . showString "ExprBlock" . showChar ' ' . showsPrec 1 block . cpar n
-    ExprArrayElems markexprlist -> opar n . showString "ExprArrayElems" . showChar ' ' . showsPrec 1 markexprlist . cpar n
-    ExprArrayRepeat expr integer -> opar n . showString "ExprArrayRepeat" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 integer . cpar n
-    ExprArrayRange integer0 integer1 -> opar n . showString "ExprArrayRange" . showChar ' ' . showsPrec 1 integer0 . showChar ' ' . showsPrec 1 integer1 . cpar n
-    ExprTuple markexprlist -> opar n . showString "ExprTuple" . showChar ' ' . showsPrec 1 markexprlist . cpar n
+    FunctionCall ident sepexprlist -> opar n . showString "FunctionCall" . showChar ' ' . showsPrec 1 ident . showChar ' ' . showsPrec 1 sepexprlist . cpar n
+    ArrayLookup expr0 expr1 -> opar n . showString "ArrayLookup" . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . cpar n
+    TupleLookup expr integer -> opar n . showString "TupleLookup" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 integer . cpar n
+    IfElseExpr ifelse -> opar n . showString "IfElseExpr" . showChar ' ' . showsPrec 1 ifelse . cpar n
+    BlockExpr block -> opar n . showString "BlockExpr" . showChar ' ' . showsPrec 1 block . cpar n
+    ArrayElements markexprlist -> opar n . showString "ArrayElements" . showChar ' ' . showsPrec 1 markexprlist . cpar n
+    ArrayRepeat expr integer -> opar n . showString "ArrayRepeat" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 integer . cpar n
+    ArrayRange integer0 integer1 -> opar n . showString "ArrayRange" . showChar ' ' . showsPrec 1 integer0 . showChar ' ' . showsPrec 1 integer1 . cpar n
+    TupleConstruct markexprlist -> opar n . showString "TupleConstruct" . showChar ' ' . showsPrec 1 markexprlist . cpar n
     SepExprNil -> showString "SepExprNil"
     SepExprOne expr -> opar n . showString "SepExprOne" . showChar ' ' . showsPrec 1 expr . cpar n
     SepExprMore expr sepexprlist -> opar n . showString "SepExprMore" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 sepexprlist . cpar n
@@ -233,21 +235,21 @@ instance Show (Tree c) where
     MarkExprMore expr markexprlist -> opar n . showString "MarkExprMore" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 markexprlist . cpar n
     MarkExprHead expr -> opar n . showString "MarkExprHead" . showChar ' ' . showsPrec 1 expr . cpar n
     MarkExprTail markexprlist expr -> opar n . showString "MarkExprTail" . showChar ' ' . showsPrec 1 markexprlist . showChar ' ' . showsPrec 1 expr . cpar n
-    TypeBool -> showString "TypeBool"
-    TypeI32 -> showString "TypeI32"
-    TypeRef type' -> opar n . showString "TypeRef" . showChar ' ' . showsPrec 1 type' . cpar n
-    TypeMutRef type' -> opar n . showString "TypeMutRef" . showChar ' ' . showsPrec 1 type' . cpar n
-    TypeArray type' integer -> opar n . showString "TypeArray" . showChar ' ' . showsPrec 1 type' . showChar ' ' . showsPrec 1 integer . cpar n
-    TypeTuple marktypelist -> opar n . showString "TypeTuple" . showChar ' ' . showsPrec 1 marktypelist . cpar n
+    Bool -> showString "Bool"
+    I32 -> showString "I32"
+    Reference type' -> opar n . showString "Reference" . showChar ' ' . showsPrec 1 type' . cpar n
+    MutableReference type' -> opar n . showString "MutableReference" . showChar ' ' . showsPrec 1 type' . cpar n
+    Array type' integer -> opar n . showString "Array" . showChar ' ' . showsPrec 1 type' . showChar ' ' . showsPrec 1 integer . cpar n
+    Tuple marktypelist -> opar n . showString "Tuple" . showChar ' ' . showsPrec 1 marktypelist . cpar n
     MarkTNil -> showString "MarkTNil"
     MarkTOne type' -> opar n . showString "MarkTOne" . showChar ' ' . showsPrec 1 type' . cpar n
     MarkTMore type' marktypelist -> opar n . showString "MarkTMore" . showChar ' ' . showsPrec 1 type' . showChar ' ' . showsPrec 1 marktypelist . cpar n
     MarkTHead type' -> opar n . showString "MarkTHead" . showChar ' ' . showsPrec 1 type' . cpar n
     MarkTTail marktypelist type' -> opar n . showString "MarkTTail" . showChar ' ' . showsPrec 1 marktypelist . showChar ' ' . showsPrec 1 type' . cpar n
-    PatternIdent ident -> opar n . showString "PatternIdent" . showChar ' ' . showsPrec 1 ident . cpar n
-    PatternMutIdent ident -> opar n . showString "PatternMutIdent" . showChar ' ' . showsPrec 1 ident . cpar n
-    PatternIgnore -> showString "PatternIgnore"
-    PatternTuple markletpatternlist -> opar n . showString "PatternTuple" . showChar ' ' . showsPrec 1 markletpatternlist . cpar n
+    LetPatternVariable ident -> opar n . showString "LetPatternVariable" . showChar ' ' . showsPrec 1 ident . cpar n
+    LetPatternMutableVariable ident -> opar n . showString "LetPatternMutableVariable" . showChar ' ' . showsPrec 1 ident . cpar n
+    LetPatternIgnore -> showString "LetPatternIgnore"
+    LetPatternTuple markletpatternlist -> opar n . showString "LetPatternTuple" . showChar ' ' . showsPrec 1 markletpatternlist . cpar n
     MarkPatternNil -> showString "MarkPatternNil"
     MarkPatternOne letpattern -> opar n . showString "MarkPatternOne" . showChar ' ' . showsPrec 1 letpattern . cpar n
     MarkPatternMore letpattern markletpatternlist -> opar n . showString "MarkPatternMore" . showChar ' ' . showsPrec 1 letpattern . showChar ' ' . showsPrec 1 markletpatternlist . cpar n
@@ -263,20 +265,21 @@ instance Show (Tree c) where
     SepPTail sepparameterlist parameter -> opar n . showString "SepPTail" . showChar ' ' . showsPrec 1 sepparameterlist . showChar ' ' . showsPrec 1 parameter . cpar n
     IfElse expr block0 block1 -> opar n . showString "IfElse" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 block0 . showChar ' ' . showsPrec 1 block1 . cpar n
     IfStmt expr block -> opar n . showString "IfStmt" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 block . cpar n
-    StmtFnDecl fundecl -> opar n . showString "StmtFnDecl" . showChar ' ' . showsPrec 1 fundecl . cpar n
-    StmtExpr expr -> opar n . showString "StmtExpr" . showChar ' ' . showsPrec 1 expr . cpar n
-    StmtBreak -> showString "StmtBreak"
-    StmtContinue -> showString "StmtContinue"
-    StmtIf ifstmt -> opar n . showString "StmtIf" . showChar ' ' . showsPrec 1 ifstmt . cpar n
-    StmtIfElse ifelse -> opar n . showString "StmtIfElse" . showChar ' ' . showsPrec 1 ifelse . cpar n
-    StmtLoop block -> opar n . showString "StmtLoop" . showChar ' ' . showsPrec 1 block . cpar n
-    StmtWhile expr block -> opar n . showString "StmtWhile" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 block . cpar n
-    StmtForIterable ident expr block -> opar n . showString "StmtForIterable" . showChar ' ' . showsPrec 1 ident . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 block . cpar n
-    StmtForRange ident expr0 expr1 block2 -> opar n . showString "StmtForRange" . showChar ' ' . showsPrec 1 ident . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . showChar ' ' . showsPrec 1 block2 . cpar n
-    StmtLetType letpattern type' expr -> opar n . showString "StmtLetType" . showChar ' ' . showsPrec 1 letpattern . showChar ' ' . showsPrec 1 type' . showChar ' ' . showsPrec 1 expr . cpar n
-    StmtLet letpattern expr -> opar n . showString "StmtLet" . showChar ' ' . showsPrec 1 letpattern . showChar ' ' . showsPrec 1 expr . cpar n
-    BlockStmt stmts -> opar n . showString "BlockStmt" . showChar ' ' . showsPrec 1 stmts . cpar n
-    BlockExpr stmts expr -> opar n . showString "BlockExpr" . showChar ' ' . showsPrec 1 stmts . showChar ' ' . showsPrec 1 expr . cpar n
+    FunDeclStmt fundecl -> opar n . showString "FunDeclStmt" . showChar ' ' . showsPrec 1 fundecl . cpar n
+    Stmt expr -> opar n . showString "Stmt" . showChar ' ' . showsPrec 1 expr . cpar n
+    Break -> showString "Break"
+    Continue -> showString "Continue"
+    If ifstmt -> opar n . showString "If" . showChar ' ' . showsPrec 1 ifstmt . cpar n
+    IfElseStmt ifelse -> opar n . showString "IfElseStmt" . showChar ' ' . showsPrec 1 ifelse . cpar n
+    Loop block -> opar n . showString "Loop" . showChar ' ' . showsPrec 1 block . cpar n
+    While expr block -> opar n . showString "While" . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 block . cpar n
+    IterableForLoop ident expr block -> opar n . showString "IterableForLoop" . showChar ' ' . showsPrec 1 ident . showChar ' ' . showsPrec 1 expr . showChar ' ' . showsPrec 1 block . cpar n
+    RangeForLoop ident expr0 expr1 block2 -> opar n . showString "RangeForLoop" . showChar ' ' . showsPrec 1 ident . showChar ' ' . showsPrec 1 expr0 . showChar ' ' . showsPrec 1 expr1 . showChar ' ' . showsPrec 1 block2 . cpar n
+    LetStmtStrict letpattern type' expr -> opar n . showString "LetStmtStrict" . showChar ' ' . showsPrec 1 letpattern . showChar ' ' . showsPrec 1 type' . showChar ' ' . showsPrec 1 expr . cpar n
+    LetStmt letpattern expr -> opar n . showString "LetStmt" . showChar ' ' . showsPrec 1 letpattern . showChar ' ' . showsPrec 1 expr . cpar n
+    BlockStmt block -> opar n . showString "BlockStmt" . showChar ' ' . showsPrec 1 block . cpar n
+    Block stmts -> opar n . showString "Block" . showChar ' ' . showsPrec 1 stmts . cpar n
+    BlockWithValue stmts expr -> opar n . showString "BlockWithValue" . showChar ' ' . showsPrec 1 stmts . showChar ' ' . showsPrec 1 expr . cpar n
     Program fundecls -> opar n . showString "Program" . showChar ' ' . showsPrec 1 fundecls . cpar n
     Ident str -> opar n . showString "Ident" . showChar ' ' . showsPrec 1 str . cpar n
     Boolean str -> opar n . showString "Boolean" . showChar ' ' . showsPrec 1 str . cpar n
@@ -288,33 +291,33 @@ instance Eq (Tree c) where (==) = johnMajorEq
 johnMajorEq :: Tree a -> Tree b -> Bool
 johnMajorEq (LiteralBool boolean) (LiteralBool boolean_) = boolean == boolean_
 johnMajorEq (LiteralI32 integer) (LiteralI32 integer_) = integer == integer_
-johnMajorEq (ExprAssign expr0 expr1) (ExprAssign expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprOr expr0 expr1) (ExprOr expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprAnd expr0 expr1) (ExprAnd expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprEq expr0 expr1) (ExprEq expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprNotEq expr0 expr1) (ExprNotEq expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprLess expr0 expr1) (ExprLess expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprAdd expr0 expr1) (ExprAdd expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprSub expr0 expr1) (ExprSub expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprMul expr0 expr1) (ExprMul expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprDiv expr0 expr1) (ExprDiv expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprMod expr0 expr1) (ExprMod expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprNeg expr) (ExprNeg expr_) = expr == expr_
-johnMajorEq (ExprDeref expr) (ExprDeref expr_) = expr == expr_
-johnMajorEq (ExprNot expr) (ExprNot expr_) = expr == expr_
-johnMajorEq (ExprBorrow expr) (ExprBorrow expr_) = expr == expr_
-johnMajorEq (ExprMutBorrow expr) (ExprMutBorrow expr_) = expr == expr_
-johnMajorEq (ExprLiteral literal) (ExprLiteral literal_) = literal == literal_
+johnMajorEq (Assign expr0 expr1) (Assign expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (Or expr0 expr1) (Or expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (And expr0 expr1) (And expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (Equal expr0 expr1) (Equal expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (NotEqual expr0 expr1) (NotEqual expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (Less expr0 expr1) (Less expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (Add expr0 expr1) (Add expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (Subtract expr0 expr1) (Subtract expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (Multiply expr0 expr1) (Multiply expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (Divide expr0 expr1) (Divide expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (Modulo expr0 expr1) (Modulo expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (Negate expr) (Negate expr_) = expr == expr_
+johnMajorEq (Dereference expr) (Dereference expr_) = expr == expr_
+johnMajorEq (Not expr) (Not expr_) = expr == expr_
+johnMajorEq (Borrow expr) (Borrow expr_) = expr == expr_
+johnMajorEq (MutableBorrow expr) (MutableBorrow expr_) = expr == expr_
+johnMajorEq (LiteralExpr literal) (LiteralExpr literal_) = literal == literal_
 johnMajorEq (ExprIdent ident) (ExprIdent ident_) = ident == ident_
-johnMajorEq (ExprCall ident sepexprlist) (ExprCall ident_ sepexprlist_) = ident == ident_ && sepexprlist == sepexprlist_
-johnMajorEq (ExprArrayLookup expr0 expr1) (ExprArrayLookup expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
-johnMajorEq (ExprTupleLookup expr integer) (ExprTupleLookup expr_ integer_) = expr == expr_ && integer == integer_
-johnMajorEq (ExprIfElse ifelse) (ExprIfElse ifelse_) = ifelse == ifelse_
-johnMajorEq (ExprBlock block) (ExprBlock block_) = block == block_
-johnMajorEq (ExprArrayElems markexprlist) (ExprArrayElems markexprlist_) = markexprlist == markexprlist_
-johnMajorEq (ExprArrayRepeat expr integer) (ExprArrayRepeat expr_ integer_) = expr == expr_ && integer == integer_
-johnMajorEq (ExprArrayRange integer0 integer1) (ExprArrayRange integer0_ integer1_) = integer0 == integer0_ && integer1 == integer1_
-johnMajorEq (ExprTuple markexprlist) (ExprTuple markexprlist_) = markexprlist == markexprlist_
+johnMajorEq (FunctionCall ident sepexprlist) (FunctionCall ident_ sepexprlist_) = ident == ident_ && sepexprlist == sepexprlist_
+johnMajorEq (ArrayLookup expr0 expr1) (ArrayLookup expr0_ expr1_) = expr0 == expr0_ && expr1 == expr1_
+johnMajorEq (TupleLookup expr integer) (TupleLookup expr_ integer_) = expr == expr_ && integer == integer_
+johnMajorEq (IfElseExpr ifelse) (IfElseExpr ifelse_) = ifelse == ifelse_
+johnMajorEq (BlockExpr block) (BlockExpr block_) = block == block_
+johnMajorEq (ArrayElements markexprlist) (ArrayElements markexprlist_) = markexprlist == markexprlist_
+johnMajorEq (ArrayRepeat expr integer) (ArrayRepeat expr_ integer_) = expr == expr_ && integer == integer_
+johnMajorEq (ArrayRange integer0 integer1) (ArrayRange integer0_ integer1_) = integer0 == integer0_ && integer1 == integer1_
+johnMajorEq (TupleConstruct markexprlist) (TupleConstruct markexprlist_) = markexprlist == markexprlist_
 johnMajorEq SepExprNil SepExprNil = True
 johnMajorEq (SepExprOne expr) (SepExprOne expr_) = expr == expr_
 johnMajorEq (SepExprMore expr sepexprlist) (SepExprMore expr_ sepexprlist_) = expr == expr_ && sepexprlist == sepexprlist_
@@ -325,21 +328,21 @@ johnMajorEq (MarkExprOne expr) (MarkExprOne expr_) = expr == expr_
 johnMajorEq (MarkExprMore expr markexprlist) (MarkExprMore expr_ markexprlist_) = expr == expr_ && markexprlist == markexprlist_
 johnMajorEq (MarkExprHead expr) (MarkExprHead expr_) = expr == expr_
 johnMajorEq (MarkExprTail markexprlist expr) (MarkExprTail markexprlist_ expr_) = markexprlist == markexprlist_ && expr == expr_
-johnMajorEq TypeBool TypeBool = True
-johnMajorEq TypeI32 TypeI32 = True
-johnMajorEq (TypeRef type') (TypeRef type'_) = type' == type'_
-johnMajorEq (TypeMutRef type') (TypeMutRef type'_) = type' == type'_
-johnMajorEq (TypeArray type' integer) (TypeArray type'_ integer_) = type' == type'_ && integer == integer_
-johnMajorEq (TypeTuple marktypelist) (TypeTuple marktypelist_) = marktypelist == marktypelist_
+johnMajorEq Bool Bool = True
+johnMajorEq I32 I32 = True
+johnMajorEq (Reference type') (Reference type'_) = type' == type'_
+johnMajorEq (MutableReference type') (MutableReference type'_) = type' == type'_
+johnMajorEq (Array type' integer) (Array type'_ integer_) = type' == type'_ && integer == integer_
+johnMajorEq (Tuple marktypelist) (Tuple marktypelist_) = marktypelist == marktypelist_
 johnMajorEq MarkTNil MarkTNil = True
 johnMajorEq (MarkTOne type') (MarkTOne type'_) = type' == type'_
 johnMajorEq (MarkTMore type' marktypelist) (MarkTMore type'_ marktypelist_) = type' == type'_ && marktypelist == marktypelist_
 johnMajorEq (MarkTHead type') (MarkTHead type'_) = type' == type'_
 johnMajorEq (MarkTTail marktypelist type') (MarkTTail marktypelist_ type'_) = marktypelist == marktypelist_ && type' == type'_
-johnMajorEq (PatternIdent ident) (PatternIdent ident_) = ident == ident_
-johnMajorEq (PatternMutIdent ident) (PatternMutIdent ident_) = ident == ident_
-johnMajorEq PatternIgnore PatternIgnore = True
-johnMajorEq (PatternTuple markletpatternlist) (PatternTuple markletpatternlist_) = markletpatternlist == markletpatternlist_
+johnMajorEq (LetPatternVariable ident) (LetPatternVariable ident_) = ident == ident_
+johnMajorEq (LetPatternMutableVariable ident) (LetPatternMutableVariable ident_) = ident == ident_
+johnMajorEq LetPatternIgnore LetPatternIgnore = True
+johnMajorEq (LetPatternTuple markletpatternlist) (LetPatternTuple markletpatternlist_) = markletpatternlist == markletpatternlist_
 johnMajorEq MarkPatternNil MarkPatternNil = True
 johnMajorEq (MarkPatternOne letpattern) (MarkPatternOne letpattern_) = letpattern == letpattern_
 johnMajorEq (MarkPatternMore letpattern markletpatternlist) (MarkPatternMore letpattern_ markletpatternlist_) = letpattern == letpattern_ && markletpatternlist == markletpatternlist_
@@ -355,20 +358,21 @@ johnMajorEq (SepPHead parameter) (SepPHead parameter_) = parameter == parameter_
 johnMajorEq (SepPTail sepparameterlist parameter) (SepPTail sepparameterlist_ parameter_) = sepparameterlist == sepparameterlist_ && parameter == parameter_
 johnMajorEq (IfElse expr block0 block1) (IfElse expr_ block0_ block1_) = expr == expr_ && block0 == block0_ && block1 == block1_
 johnMajorEq (IfStmt expr block) (IfStmt expr_ block_) = expr == expr_ && block == block_
-johnMajorEq (StmtFnDecl fundecl) (StmtFnDecl fundecl_) = fundecl == fundecl_
-johnMajorEq (StmtExpr expr) (StmtExpr expr_) = expr == expr_
-johnMajorEq StmtBreak StmtBreak = True
-johnMajorEq StmtContinue StmtContinue = True
-johnMajorEq (StmtIf ifstmt) (StmtIf ifstmt_) = ifstmt == ifstmt_
-johnMajorEq (StmtIfElse ifelse) (StmtIfElse ifelse_) = ifelse == ifelse_
-johnMajorEq (StmtLoop block) (StmtLoop block_) = block == block_
-johnMajorEq (StmtWhile expr block) (StmtWhile expr_ block_) = expr == expr_ && block == block_
-johnMajorEq (StmtForIterable ident expr block) (StmtForIterable ident_ expr_ block_) = ident == ident_ && expr == expr_ && block == block_
-johnMajorEq (StmtForRange ident expr0 expr1 block2) (StmtForRange ident_ expr0_ expr1_ block2_) = ident == ident_ && expr0 == expr0_ && expr1 == expr1_ && block2 == block2_
-johnMajorEq (StmtLetType letpattern type' expr) (StmtLetType letpattern_ type'_ expr_) = letpattern == letpattern_ && type' == type'_ && expr == expr_
-johnMajorEq (StmtLet letpattern expr) (StmtLet letpattern_ expr_) = letpattern == letpattern_ && expr == expr_
-johnMajorEq (BlockStmt stmts) (BlockStmt stmts_) = stmts == stmts_
-johnMajorEq (BlockExpr stmts expr) (BlockExpr stmts_ expr_) = stmts == stmts_ && expr == expr_
+johnMajorEq (FunDeclStmt fundecl) (FunDeclStmt fundecl_) = fundecl == fundecl_
+johnMajorEq (Stmt expr) (Stmt expr_) = expr == expr_
+johnMajorEq Break Break = True
+johnMajorEq Continue Continue = True
+johnMajorEq (If ifstmt) (If ifstmt_) = ifstmt == ifstmt_
+johnMajorEq (IfElseStmt ifelse) (IfElseStmt ifelse_) = ifelse == ifelse_
+johnMajorEq (Loop block) (Loop block_) = block == block_
+johnMajorEq (While expr block) (While expr_ block_) = expr == expr_ && block == block_
+johnMajorEq (IterableForLoop ident expr block) (IterableForLoop ident_ expr_ block_) = ident == ident_ && expr == expr_ && block == block_
+johnMajorEq (RangeForLoop ident expr0 expr1 block2) (RangeForLoop ident_ expr0_ expr1_ block2_) = ident == ident_ && expr0 == expr0_ && expr1 == expr1_ && block2 == block2_
+johnMajorEq (LetStmtStrict letpattern type' expr) (LetStmtStrict letpattern_ type'_ expr_) = letpattern == letpattern_ && type' == type'_ && expr == expr_
+johnMajorEq (LetStmt letpattern expr) (LetStmt letpattern_ expr_) = letpattern == letpattern_ && expr == expr_
+johnMajorEq (BlockStmt block) (BlockStmt block_) = block == block_
+johnMajorEq (Block stmts) (Block stmts_) = stmts == stmts_
+johnMajorEq (BlockWithValue stmts expr) (BlockWithValue stmts_ expr_) = stmts == stmts_ && expr == expr_
 johnMajorEq (Program fundecls) (Program fundecls_) = fundecls == fundecls_
 johnMajorEq (Ident str) (Ident str_) = str == str_
 johnMajorEq (Boolean str) (Boolean str_) = str == str_
@@ -379,33 +383,33 @@ instance Ord (Tree c) where
 index :: Tree c -> Int
 index (LiteralBool _) = 0
 index (LiteralI32 _) = 1
-index (ExprAssign _ _) = 2
-index (ExprOr _ _) = 3
-index (ExprAnd _ _) = 4
-index (ExprEq _ _) = 5
-index (ExprNotEq _ _) = 6
-index (ExprLess _ _) = 7
-index (ExprAdd _ _) = 8
-index (ExprSub _ _) = 9
-index (ExprMul _ _) = 10
-index (ExprDiv _ _) = 11
-index (ExprMod _ _) = 12
-index (ExprNeg _) = 13
-index (ExprDeref _) = 14
-index (ExprNot _) = 15
-index (ExprBorrow _) = 16
-index (ExprMutBorrow _) = 17
-index (ExprLiteral _) = 18
+index (Assign _ _) = 2
+index (Or _ _) = 3
+index (And _ _) = 4
+index (Equal _ _) = 5
+index (NotEqual _ _) = 6
+index (Less _ _) = 7
+index (Add _ _) = 8
+index (Subtract _ _) = 9
+index (Multiply _ _) = 10
+index (Divide _ _) = 11
+index (Modulo _ _) = 12
+index (Negate _) = 13
+index (Dereference _) = 14
+index (Not _) = 15
+index (Borrow _) = 16
+index (MutableBorrow _) = 17
+index (LiteralExpr _) = 18
 index (ExprIdent _) = 19
-index (ExprCall _ _) = 20
-index (ExprArrayLookup _ _) = 21
-index (ExprTupleLookup _ _) = 22
-index (ExprIfElse _) = 23
-index (ExprBlock _) = 24
-index (ExprArrayElems _) = 25
-index (ExprArrayRepeat _ _) = 26
-index (ExprArrayRange _ _) = 27
-index (ExprTuple _) = 28
+index (FunctionCall _ _) = 20
+index (ArrayLookup _ _) = 21
+index (TupleLookup _ _) = 22
+index (IfElseExpr _) = 23
+index (BlockExpr _) = 24
+index (ArrayElements _) = 25
+index (ArrayRepeat _ _) = 26
+index (ArrayRange _ _) = 27
+index (TupleConstruct _) = 28
 index (SepExprNil ) = 29
 index (SepExprOne _) = 30
 index (SepExprMore _ _) = 31
@@ -416,21 +420,21 @@ index (MarkExprOne _) = 35
 index (MarkExprMore _ _) = 36
 index (MarkExprHead _) = 37
 index (MarkExprTail _ _) = 38
-index (TypeBool ) = 39
-index (TypeI32 ) = 40
-index (TypeRef _) = 41
-index (TypeMutRef _) = 42
-index (TypeArray _ _) = 43
-index (TypeTuple _) = 44
+index (Bool ) = 39
+index (I32 ) = 40
+index (Reference _) = 41
+index (MutableReference _) = 42
+index (Array _ _) = 43
+index (Tuple _) = 44
 index (MarkTNil ) = 45
 index (MarkTOne _) = 46
 index (MarkTMore _ _) = 47
 index (MarkTHead _) = 48
 index (MarkTTail _ _) = 49
-index (PatternIdent _) = 50
-index (PatternMutIdent _) = 51
-index (PatternIgnore ) = 52
-index (PatternTuple _) = 53
+index (LetPatternVariable _) = 50
+index (LetPatternMutableVariable _) = 51
+index (LetPatternIgnore ) = 52
+index (LetPatternTuple _) = 53
 index (MarkPatternNil ) = 54
 index (MarkPatternOne _) = 55
 index (MarkPatternMore _ _) = 56
@@ -446,53 +450,54 @@ index (SepPHead _) = 65
 index (SepPTail _ _) = 66
 index (IfElse _ _ _) = 67
 index (IfStmt _ _) = 68
-index (StmtFnDecl _) = 69
-index (StmtExpr _) = 70
-index (StmtBreak ) = 71
-index (StmtContinue ) = 72
-index (StmtIf _) = 73
-index (StmtIfElse _) = 74
-index (StmtLoop _) = 75
-index (StmtWhile _ _) = 76
-index (StmtForIterable _ _ _) = 77
-index (StmtForRange _ _ _ _) = 78
-index (StmtLetType _ _ _) = 79
-index (StmtLet _ _) = 80
+index (FunDeclStmt _) = 69
+index (Stmt _) = 70
+index (Break ) = 71
+index (Continue ) = 72
+index (If _) = 73
+index (IfElseStmt _) = 74
+index (Loop _) = 75
+index (While _ _) = 76
+index (IterableForLoop _ _ _) = 77
+index (RangeForLoop _ _ _ _) = 78
+index (LetStmtStrict _ _ _) = 79
+index (LetStmt _ _) = 80
 index (BlockStmt _) = 81
-index (BlockExpr _ _) = 82
-index (Program _) = 83
-index (Ident _) = 84
-index (Boolean _) = 85
+index (Block _) = 82
+index (BlockWithValue _ _) = 83
+index (Program _) = 84
+index (Ident _) = 85
+index (Boolean _) = 86
 compareSame :: Tree c -> Tree c -> Ordering
 compareSame (LiteralBool boolean) (LiteralBool boolean_) = compare boolean boolean_
 compareSame (LiteralI32 integer) (LiteralI32 integer_) = compare integer integer_
-compareSame (ExprAssign expr0 expr1) (ExprAssign expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprOr expr0 expr1) (ExprOr expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprAnd expr0 expr1) (ExprAnd expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprEq expr0 expr1) (ExprEq expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprNotEq expr0 expr1) (ExprNotEq expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprLess expr0 expr1) (ExprLess expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprAdd expr0 expr1) (ExprAdd expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprSub expr0 expr1) (ExprSub expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprMul expr0 expr1) (ExprMul expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprDiv expr0 expr1) (ExprDiv expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprMod expr0 expr1) (ExprMod expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprNeg expr) (ExprNeg expr_) = compare expr expr_
-compareSame (ExprDeref expr) (ExprDeref expr_) = compare expr expr_
-compareSame (ExprNot expr) (ExprNot expr_) = compare expr expr_
-compareSame (ExprBorrow expr) (ExprBorrow expr_) = compare expr expr_
-compareSame (ExprMutBorrow expr) (ExprMutBorrow expr_) = compare expr expr_
-compareSame (ExprLiteral literal) (ExprLiteral literal_) = compare literal literal_
+compareSame (Assign expr0 expr1) (Assign expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (Or expr0 expr1) (Or expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (And expr0 expr1) (And expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (Equal expr0 expr1) (Equal expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (NotEqual expr0 expr1) (NotEqual expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (Less expr0 expr1) (Less expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (Add expr0 expr1) (Add expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (Subtract expr0 expr1) (Subtract expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (Multiply expr0 expr1) (Multiply expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (Divide expr0 expr1) (Divide expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (Modulo expr0 expr1) (Modulo expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (Negate expr) (Negate expr_) = compare expr expr_
+compareSame (Dereference expr) (Dereference expr_) = compare expr expr_
+compareSame (Not expr) (Not expr_) = compare expr expr_
+compareSame (Borrow expr) (Borrow expr_) = compare expr expr_
+compareSame (MutableBorrow expr) (MutableBorrow expr_) = compare expr expr_
+compareSame (LiteralExpr literal) (LiteralExpr literal_) = compare literal literal_
 compareSame (ExprIdent ident) (ExprIdent ident_) = compare ident ident_
-compareSame (ExprCall ident sepexprlist) (ExprCall ident_ sepexprlist_) = mappend (compare ident ident_) (compare sepexprlist sepexprlist_)
-compareSame (ExprArrayLookup expr0 expr1) (ExprArrayLookup expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
-compareSame (ExprTupleLookup expr integer) (ExprTupleLookup expr_ integer_) = mappend (compare expr expr_) (compare integer integer_)
-compareSame (ExprIfElse ifelse) (ExprIfElse ifelse_) = compare ifelse ifelse_
-compareSame (ExprBlock block) (ExprBlock block_) = compare block block_
-compareSame (ExprArrayElems markexprlist) (ExprArrayElems markexprlist_) = compare markexprlist markexprlist_
-compareSame (ExprArrayRepeat expr integer) (ExprArrayRepeat expr_ integer_) = mappend (compare expr expr_) (compare integer integer_)
-compareSame (ExprArrayRange integer0 integer1) (ExprArrayRange integer0_ integer1_) = mappend (compare integer0 integer0_) (compare integer1 integer1_)
-compareSame (ExprTuple markexprlist) (ExprTuple markexprlist_) = compare markexprlist markexprlist_
+compareSame (FunctionCall ident sepexprlist) (FunctionCall ident_ sepexprlist_) = mappend (compare ident ident_) (compare sepexprlist sepexprlist_)
+compareSame (ArrayLookup expr0 expr1) (ArrayLookup expr0_ expr1_) = mappend (compare expr0 expr0_) (compare expr1 expr1_)
+compareSame (TupleLookup expr integer) (TupleLookup expr_ integer_) = mappend (compare expr expr_) (compare integer integer_)
+compareSame (IfElseExpr ifelse) (IfElseExpr ifelse_) = compare ifelse ifelse_
+compareSame (BlockExpr block) (BlockExpr block_) = compare block block_
+compareSame (ArrayElements markexprlist) (ArrayElements markexprlist_) = compare markexprlist markexprlist_
+compareSame (ArrayRepeat expr integer) (ArrayRepeat expr_ integer_) = mappend (compare expr expr_) (compare integer integer_)
+compareSame (ArrayRange integer0 integer1) (ArrayRange integer0_ integer1_) = mappend (compare integer0 integer0_) (compare integer1 integer1_)
+compareSame (TupleConstruct markexprlist) (TupleConstruct markexprlist_) = compare markexprlist markexprlist_
 compareSame SepExprNil SepExprNil = EQ
 compareSame (SepExprOne expr) (SepExprOne expr_) = compare expr expr_
 compareSame (SepExprMore expr sepexprlist) (SepExprMore expr_ sepexprlist_) = mappend (compare expr expr_) (compare sepexprlist sepexprlist_)
@@ -503,21 +508,21 @@ compareSame (MarkExprOne expr) (MarkExprOne expr_) = compare expr expr_
 compareSame (MarkExprMore expr markexprlist) (MarkExprMore expr_ markexprlist_) = mappend (compare expr expr_) (compare markexprlist markexprlist_)
 compareSame (MarkExprHead expr) (MarkExprHead expr_) = compare expr expr_
 compareSame (MarkExprTail markexprlist expr) (MarkExprTail markexprlist_ expr_) = mappend (compare markexprlist markexprlist_) (compare expr expr_)
-compareSame TypeBool TypeBool = EQ
-compareSame TypeI32 TypeI32 = EQ
-compareSame (TypeRef type') (TypeRef type'_) = compare type' type'_
-compareSame (TypeMutRef type') (TypeMutRef type'_) = compare type' type'_
-compareSame (TypeArray type' integer) (TypeArray type'_ integer_) = mappend (compare type' type'_) (compare integer integer_)
-compareSame (TypeTuple marktypelist) (TypeTuple marktypelist_) = compare marktypelist marktypelist_
+compareSame Bool Bool = EQ
+compareSame I32 I32 = EQ
+compareSame (Reference type') (Reference type'_) = compare type' type'_
+compareSame (MutableReference type') (MutableReference type'_) = compare type' type'_
+compareSame (Array type' integer) (Array type'_ integer_) = mappend (compare type' type'_) (compare integer integer_)
+compareSame (Tuple marktypelist) (Tuple marktypelist_) = compare marktypelist marktypelist_
 compareSame MarkTNil MarkTNil = EQ
 compareSame (MarkTOne type') (MarkTOne type'_) = compare type' type'_
 compareSame (MarkTMore type' marktypelist) (MarkTMore type'_ marktypelist_) = mappend (compare type' type'_) (compare marktypelist marktypelist_)
 compareSame (MarkTHead type') (MarkTHead type'_) = compare type' type'_
 compareSame (MarkTTail marktypelist type') (MarkTTail marktypelist_ type'_) = mappend (compare marktypelist marktypelist_) (compare type' type'_)
-compareSame (PatternIdent ident) (PatternIdent ident_) = compare ident ident_
-compareSame (PatternMutIdent ident) (PatternMutIdent ident_) = compare ident ident_
-compareSame PatternIgnore PatternIgnore = EQ
-compareSame (PatternTuple markletpatternlist) (PatternTuple markletpatternlist_) = compare markletpatternlist markletpatternlist_
+compareSame (LetPatternVariable ident) (LetPatternVariable ident_) = compare ident ident_
+compareSame (LetPatternMutableVariable ident) (LetPatternMutableVariable ident_) = compare ident ident_
+compareSame LetPatternIgnore LetPatternIgnore = EQ
+compareSame (LetPatternTuple markletpatternlist) (LetPatternTuple markletpatternlist_) = compare markletpatternlist markletpatternlist_
 compareSame MarkPatternNil MarkPatternNil = EQ
 compareSame (MarkPatternOne letpattern) (MarkPatternOne letpattern_) = compare letpattern letpattern_
 compareSame (MarkPatternMore letpattern markletpatternlist) (MarkPatternMore letpattern_ markletpatternlist_) = mappend (compare letpattern letpattern_) (compare markletpatternlist markletpatternlist_)
@@ -533,20 +538,21 @@ compareSame (SepPHead parameter) (SepPHead parameter_) = compare parameter param
 compareSame (SepPTail sepparameterlist parameter) (SepPTail sepparameterlist_ parameter_) = mappend (compare sepparameterlist sepparameterlist_) (compare parameter parameter_)
 compareSame (IfElse expr block0 block1) (IfElse expr_ block0_ block1_) = mappend (compare expr expr_) (mappend (compare block0 block0_) (compare block1 block1_))
 compareSame (IfStmt expr block) (IfStmt expr_ block_) = mappend (compare expr expr_) (compare block block_)
-compareSame (StmtFnDecl fundecl) (StmtFnDecl fundecl_) = compare fundecl fundecl_
-compareSame (StmtExpr expr) (StmtExpr expr_) = compare expr expr_
-compareSame StmtBreak StmtBreak = EQ
-compareSame StmtContinue StmtContinue = EQ
-compareSame (StmtIf ifstmt) (StmtIf ifstmt_) = compare ifstmt ifstmt_
-compareSame (StmtIfElse ifelse) (StmtIfElse ifelse_) = compare ifelse ifelse_
-compareSame (StmtLoop block) (StmtLoop block_) = compare block block_
-compareSame (StmtWhile expr block) (StmtWhile expr_ block_) = mappend (compare expr expr_) (compare block block_)
-compareSame (StmtForIterable ident expr block) (StmtForIterable ident_ expr_ block_) = mappend (compare ident ident_) (mappend (compare expr expr_) (compare block block_))
-compareSame (StmtForRange ident expr0 expr1 block2) (StmtForRange ident_ expr0_ expr1_ block2_) = mappend (compare ident ident_) (mappend (compare expr0 expr0_) (mappend (compare expr1 expr1_) (compare block2 block2_)))
-compareSame (StmtLetType letpattern type' expr) (StmtLetType letpattern_ type'_ expr_) = mappend (compare letpattern letpattern_) (mappend (compare type' type'_) (compare expr expr_))
-compareSame (StmtLet letpattern expr) (StmtLet letpattern_ expr_) = mappend (compare letpattern letpattern_) (compare expr expr_)
-compareSame (BlockStmt stmts) (BlockStmt stmts_) = compare stmts stmts_
-compareSame (BlockExpr stmts expr) (BlockExpr stmts_ expr_) = mappend (compare stmts stmts_) (compare expr expr_)
+compareSame (FunDeclStmt fundecl) (FunDeclStmt fundecl_) = compare fundecl fundecl_
+compareSame (Stmt expr) (Stmt expr_) = compare expr expr_
+compareSame Break Break = EQ
+compareSame Continue Continue = EQ
+compareSame (If ifstmt) (If ifstmt_) = compare ifstmt ifstmt_
+compareSame (IfElseStmt ifelse) (IfElseStmt ifelse_) = compare ifelse ifelse_
+compareSame (Loop block) (Loop block_) = compare block block_
+compareSame (While expr block) (While expr_ block_) = mappend (compare expr expr_) (compare block block_)
+compareSame (IterableForLoop ident expr block) (IterableForLoop ident_ expr_ block_) = mappend (compare ident ident_) (mappend (compare expr expr_) (compare block block_))
+compareSame (RangeForLoop ident expr0 expr1 block2) (RangeForLoop ident_ expr0_ expr1_ block2_) = mappend (compare ident ident_) (mappend (compare expr0 expr0_) (mappend (compare expr1 expr1_) (compare block2 block2_)))
+compareSame (LetStmtStrict letpattern type' expr) (LetStmtStrict letpattern_ type'_ expr_) = mappend (compare letpattern letpattern_) (mappend (compare type' type'_) (compare expr expr_))
+compareSame (LetStmt letpattern expr) (LetStmt letpattern_ expr_) = mappend (compare letpattern letpattern_) (compare expr expr_)
+compareSame (BlockStmt block) (BlockStmt block_) = compare block block_
+compareSame (Block stmts) (Block stmts_) = compare stmts stmts_
+compareSame (BlockWithValue stmts expr) (BlockWithValue stmts_ expr_) = mappend (compare stmts stmts_) (compare expr expr_)
 compareSame (Program fundecls) (Program fundecls_) = compare fundecls fundecls_
 compareSame (Ident str) (Ident str_) = compare str str_
 compareSame (Boolean str) (Boolean str_) = compare str str_

@@ -14,33 +14,33 @@ transTree :: Tree c -> Result
 transTree t = case t of
   LiteralBool boolean -> failure t
   LiteralI32 integer -> failure t
-  ExprAssign expr0 expr1 -> failure t
-  ExprOr expr0 expr1 -> failure t
-  ExprAnd expr0 expr1 -> failure t
-  ExprEq expr0 expr1 -> failure t
-  ExprNotEq expr0 expr1 -> failure t
-  ExprLess expr0 expr1 -> failure t
-  ExprAdd expr0 expr1 -> failure t
-  ExprSub expr0 expr1 -> failure t
-  ExprMul expr0 expr1 -> failure t
-  ExprDiv expr0 expr1 -> failure t
-  ExprMod expr0 expr1 -> failure t
-  ExprNeg expr -> failure t
-  ExprDeref expr -> failure t
-  ExprNot expr -> failure t
-  ExprBorrow expr -> failure t
-  ExprMutBorrow expr -> failure t
-  ExprLiteral literal -> failure t
+  Assign expr0 expr1 -> failure t
+  Or expr0 expr1 -> failure t
+  And expr0 expr1 -> failure t
+  Equal expr0 expr1 -> failure t
+  NotEqual expr0 expr1 -> failure t
+  Less expr0 expr1 -> failure t
+  Add expr0 expr1 -> failure t
+  Subtract expr0 expr1 -> failure t
+  Multiply expr0 expr1 -> failure t
+  Divide expr0 expr1 -> failure t
+  Modulo expr0 expr1 -> failure t
+  Negate expr -> failure t
+  Dereference expr -> failure t
+  Not expr -> failure t
+  Borrow expr -> failure t
+  MutableBorrow expr -> failure t
+  LiteralExpr literal -> failure t
   ExprIdent ident -> failure t
-  ExprCall ident sepexprlist -> failure t
-  ExprArrayLookup expr0 expr1 -> failure t
-  ExprTupleLookup expr integer -> failure t
-  ExprIfElse ifelse -> failure t
-  ExprBlock block -> failure t
-  ExprArrayElems markexprlist -> failure t
-  ExprArrayRepeat expr integer -> failure t
-  ExprArrayRange integer0 integer1 -> failure t
-  ExprTuple markexprlist -> failure t
+  FunctionCall ident sepexprlist -> failure t
+  ArrayLookup expr0 expr1 -> failure t
+  TupleLookup expr integer -> failure t
+  IfElseExpr ifelse -> failure t
+  BlockExpr block -> failure t
+  ArrayElements markexprlist -> failure t
+  ArrayRepeat expr integer -> failure t
+  ArrayRange integer0 integer1 -> failure t
+  TupleConstruct markexprlist -> failure t
   SepExprNil  -> failure t
   SepExprOne expr -> failure t
   SepExprMore expr sepexprlist -> failure t
@@ -51,21 +51,21 @@ transTree t = case t of
   MarkExprMore expr markexprlist -> failure t
   MarkExprHead expr -> failure t
   MarkExprTail markexprlist expr -> failure t
-  TypeBool  -> failure t
-  TypeI32  -> failure t
-  TypeRef type' -> failure t
-  TypeMutRef type' -> failure t
-  TypeArray type' integer -> failure t
-  TypeTuple marktypelist -> failure t
+  Bool  -> failure t
+  I32  -> failure t
+  Reference type' -> failure t
+  MutableReference type' -> failure t
+  Array type' integer -> failure t
+  Tuple marktypelist -> failure t
   MarkTNil  -> failure t
   MarkTOne type' -> failure t
   MarkTMore type' marktypelist -> failure t
   MarkTHead type' -> failure t
   MarkTTail marktypelist type' -> failure t
-  PatternIdent ident -> failure t
-  PatternMutIdent ident -> failure t
-  PatternIgnore  -> failure t
-  PatternTuple markletpatternlist -> failure t
+  LetPatternVariable ident -> failure t
+  LetPatternMutableVariable ident -> failure t
+  LetPatternIgnore  -> failure t
+  LetPatternTuple markletpatternlist -> failure t
   MarkPatternNil  -> failure t
   MarkPatternOne letpattern -> failure t
   MarkPatternMore letpattern markletpatternlist -> failure t
@@ -81,20 +81,21 @@ transTree t = case t of
   SepPTail sepparameterlist parameter -> failure t
   IfElse expr block0 block1 -> failure t
   IfStmt expr block -> failure t
-  StmtFnDecl fundecl -> failure t
-  StmtExpr expr -> failure t
-  StmtBreak  -> failure t
-  StmtContinue  -> failure t
-  StmtIf ifstmt -> failure t
-  StmtIfElse ifelse -> failure t
-  StmtLoop block -> failure t
-  StmtWhile expr block -> failure t
-  StmtForIterable ident expr block -> failure t
-  StmtForRange ident expr0 expr1 block2 -> failure t
-  StmtLetType letpattern type' expr -> failure t
-  StmtLet letpattern expr -> failure t
-  BlockStmt stmts -> failure t
-  BlockExpr stmts expr -> failure t
+  FunDeclStmt fundecl -> failure t
+  Stmt expr -> failure t
+  Break  -> failure t
+  Continue  -> failure t
+  If ifstmt -> failure t
+  IfElseStmt ifelse -> failure t
+  Loop block -> failure t
+  While expr block -> failure t
+  IterableForLoop ident expr block -> failure t
+  RangeForLoop ident expr0 expr1 block2 -> failure t
+  LetStmtStrict letpattern type' expr -> failure t
+  LetStmt letpattern expr -> failure t
+  BlockStmt block -> failure t
+  Block stmts -> failure t
+  BlockWithValue stmts expr -> failure t
   Program fundecls -> failure t
   Ident str -> failure t
   Boolean str -> failure t
@@ -106,33 +107,33 @@ transLiteral t = case t of
 
 transExpr :: Expr -> Result
 transExpr t = case t of
-  ExprAssign expr0 expr1 -> failure t
-  ExprOr expr0 expr1 -> failure t
-  ExprAnd expr0 expr1 -> failure t
-  ExprEq expr0 expr1 -> failure t
-  ExprNotEq expr0 expr1 -> failure t
-  ExprLess expr0 expr1 -> failure t
-  ExprAdd expr0 expr1 -> failure t
-  ExprSub expr0 expr1 -> failure t
-  ExprMul expr0 expr1 -> failure t
-  ExprDiv expr0 expr1 -> failure t
-  ExprMod expr0 expr1 -> failure t
-  ExprNeg expr -> failure t
-  ExprDeref expr -> failure t
-  ExprNot expr -> failure t
-  ExprBorrow expr -> failure t
-  ExprMutBorrow expr -> failure t
-  ExprLiteral literal -> failure t
+  Assign expr0 expr1 -> failure t
+  Or expr0 expr1 -> failure t
+  And expr0 expr1 -> failure t
+  Equal expr0 expr1 -> failure t
+  NotEqual expr0 expr1 -> failure t
+  Less expr0 expr1 -> failure t
+  Add expr0 expr1 -> failure t
+  Subtract expr0 expr1 -> failure t
+  Multiply expr0 expr1 -> failure t
+  Divide expr0 expr1 -> failure t
+  Modulo expr0 expr1 -> failure t
+  Negate expr -> failure t
+  Dereference expr -> failure t
+  Not expr -> failure t
+  Borrow expr -> failure t
+  MutableBorrow expr -> failure t
+  LiteralExpr literal -> failure t
   ExprIdent ident -> failure t
-  ExprCall ident sepexprlist -> failure t
-  ExprArrayLookup expr0 expr1 -> failure t
-  ExprTupleLookup expr integer -> failure t
-  ExprIfElse ifelse -> failure t
-  ExprBlock block -> failure t
-  ExprArrayElems markexprlist -> failure t
-  ExprArrayRepeat expr integer -> failure t
-  ExprArrayRange integer0 integer1 -> failure t
-  ExprTuple markexprlist -> failure t
+  FunctionCall ident sepexprlist -> failure t
+  ArrayLookup expr0 expr1 -> failure t
+  TupleLookup expr integer -> failure t
+  IfElseExpr ifelse -> failure t
+  BlockExpr block -> failure t
+  ArrayElements markexprlist -> failure t
+  ArrayRepeat expr integer -> failure t
+  ArrayRange integer0 integer1 -> failure t
+  TupleConstruct markexprlist -> failure t
 
 transSepExprList :: SepExprList -> Result
 transSepExprList t = case t of
@@ -152,12 +153,12 @@ transMarkExprList t = case t of
 
 transType :: Type -> Result
 transType t = case t of
-  TypeBool  -> failure t
-  TypeI32  -> failure t
-  TypeRef type' -> failure t
-  TypeMutRef type' -> failure t
-  TypeArray type' integer -> failure t
-  TypeTuple marktypelist -> failure t
+  Bool  -> failure t
+  I32  -> failure t
+  Reference type' -> failure t
+  MutableReference type' -> failure t
+  Array type' integer -> failure t
+  Tuple marktypelist -> failure t
 
 transMarkTypeList :: MarkTypeList -> Result
 transMarkTypeList t = case t of
@@ -169,10 +170,10 @@ transMarkTypeList t = case t of
 
 transLetPattern :: LetPattern -> Result
 transLetPattern t = case t of
-  PatternIdent ident -> failure t
-  PatternMutIdent ident -> failure t
-  PatternIgnore  -> failure t
-  PatternTuple markletpatternlist -> failure t
+  LetPatternVariable ident -> failure t
+  LetPatternMutableVariable ident -> failure t
+  LetPatternIgnore  -> failure t
+  LetPatternTuple markletpatternlist -> failure t
 
 transMarkLetPatternList :: MarkLetPatternList -> Result
 transMarkLetPatternList t = case t of
@@ -209,23 +210,24 @@ transIfStmt t = case t of
 
 transStmt :: Stmt -> Result
 transStmt t = case t of
-  StmtFnDecl fundecl -> failure t
-  StmtExpr expr -> failure t
-  StmtBreak  -> failure t
-  StmtContinue  -> failure t
-  StmtIf ifstmt -> failure t
-  StmtIfElse ifelse -> failure t
-  StmtLoop block -> failure t
-  StmtWhile expr block -> failure t
-  StmtForIterable ident expr block -> failure t
-  StmtForRange ident expr0 expr1 block2 -> failure t
-  StmtLetType letpattern type' expr -> failure t
-  StmtLet letpattern expr -> failure t
+  FunDeclStmt fundecl -> failure t
+  Stmt expr -> failure t
+  Break  -> failure t
+  Continue  -> failure t
+  If ifstmt -> failure t
+  IfElseStmt ifelse -> failure t
+  Loop block -> failure t
+  While expr block -> failure t
+  IterableForLoop ident expr block -> failure t
+  RangeForLoop ident expr0 expr1 block2 -> failure t
+  LetStmtStrict letpattern type' expr -> failure t
+  LetStmt letpattern expr -> failure t
+  BlockStmt block -> failure t
 
 transBlock :: Block -> Result
 transBlock t = case t of
-  BlockStmt stmts -> failure t
-  BlockExpr stmts expr -> failure t
+  Block stmts -> failure t
+  BlockWithValue stmts expr -> failure t
 
 transProgram :: Program -> Result
 transProgram t = case t of
