@@ -24,7 +24,7 @@ invalid parse str = let tokens = myLLexer str in case parse tokens of
            Bad mgs  -> do return () -- putStrLn $ "OK                                for \"" ++ str ++ "\""
            Ok  tree -> do putStrLn $ "ERROR expected invalid, is valid  for \"" ++ str ++ "\"" -- ++ ", tree: \t\t\t" ++  show tree
 
-test = 
+test =
   [
     valid pExpr       "1",
     valid pExpr       "(1)",
@@ -82,19 +82,19 @@ test =
     invalid pExpr     "foo(i32)",
     invalid pExpr     "foo{i32}",
     valid pExpr       "foo(bar(1))",
-    
+
     valid pExpr       "a[1]",
     invalid pExpr     "a[]",
     invalid pExpr     "a[1,]",
     invalid pExpr     "a[1,2]",
     valid pExpr       "(1 + 1)[1 + 1]",
-    
+
     valid pExpr       "a.0",
     valid pExpr       "(1+1,).0",
     valid pExpr       "(1+1, 2+2).0",
     invalid pExpr     "a.(1 + 1)",
     invalid pExpr     "a.(1)",
-    
+
     valid pExpr       "{ }",
     valid pExpr       "a = b",
     valid pExpr       "a = b = c",
@@ -113,17 +113,24 @@ test =
     valid pType       "(i32, bool, i32)",
     invalid pType     "(i32, bool, i32, )",
 
-    valid pLetDecl    "let e = 32 ;",
-    invalid pLetDecl  "let e = 32 ",
-    valid pLetDecl    "let _ = 1 + 1 ; ",
-    valid pLetDecl    "let (_, (a, b, (_,))) = 1 ; ",
-    valid pLetDecl    "let (a,) = 1 ; ",
-    invalid pLetDecl  "let (,) = 1 ; ",
-    invalid pLetDecl  "let (a) = 1 ; ",
-    valid pLetDecl    "let (a, b) = 1 ; ",
-    invalid pLetDecl  "let (a, b,) = 1 ; ",
-    valid pLetDecl    "let (a, b, c) = 1 ; ",
-    invalid pLetDecl  "let (a, b, c,) = 1 ; ",
+    valid pStmt    "let e = 32 ;",
+    invalid pStmt  "let e = 32 ",
+    valid pStmt    "let _ = 1 + 1 ; ",
+    valid pStmt    "let (_, (a, b, (_,))) = 1 ; ",
+    valid pStmt    "let (a,) = 1 ; ",
+    invalid pStmt  "let (,) = 1 ; ",
+    invalid pStmt  "let (a) = 1 ; ",
+    valid pStmt    "let (a, b) = 1 ; ",
+    invalid pStmt  "let (a, b,) = 1 ; ",
+    valid pStmt    "let (a, b, c) = 1 ; ",
+    invalid pStmt  "let (a, b, c,) = 1 ; ",
+    valid pStmt    "let mut a = 1 ; ",
+    invalid pStmt  "let mut mut a = 1 ; ",
+    invalid pStmt  "let mut (a, b) = (1, 1) ; ",
+    invalid pStmt  "let mut (mut a, mut b) = (1, 1) ; ",
+    valid pStmt  "let (mut a, mut b) = (1, 1) ; ",
+    valid pStmt  "let ((mut a,), (_, _)) = (1, 1) ; ",
+    invalid pStmt  "let (mut a, mut _) = (1, 1) ; ",
 
     valid pParameter    "n : i32",
     invalid pParameter  "n",
@@ -177,12 +184,12 @@ test =
     valid pExpr       "if a { } else { }",
 
 
-    valid pLoop       "loop { }",
-    valid pLoop       "while a { }",
-    valid pLoop       "for a in [1, 2, 3] { }",
-    invalid pLoop     "for in in [1, 2, 3] { }",
-    valid pLoop       "for a in 1 .. 2 { }",
-    valid pLoop       "for a in (1+1) .. (2+2) { }",
+    valid pStmt       "loop { }",
+    valid pStmt       "while a { }",
+    valid pStmt       "for a in [1, 2, 3] { }",
+    invalid pStmt     "for in in [1, 2, 3] { }",
+    valid pStmt       "for a in 1 .. 2 { }",
+    valid pStmt       "for a in (1+1) .. (2+2) { }",
 
     valid pBlock      "{ }",
     valid pBlock      "{ 1 }",

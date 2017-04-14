@@ -109,8 +109,8 @@ instance Print Expr where
     ExprNeg expr -> prPrec i 9 (concatD [doc (showString "-"), prt 9 expr])
     ExprDeref expr -> prPrec i 9 (concatD [doc (showString "*"), prt 9 expr])
     ExprNot expr -> prPrec i 9 (concatD [doc (showString "!"), prt 9 expr])
-    ExprRef expr -> prPrec i 9 (concatD [doc (showString "&"), prt 9 expr])
-    ExprMutRef expr -> prPrec i 9 (concatD [doc (showString "&"), doc (showString "mut"), prt 9 expr])
+    ExprBorrow expr -> prPrec i 9 (concatD [doc (showString "&"), prt 9 expr])
+    ExprMutBorrow expr -> prPrec i 9 (concatD [doc (showString "&"), doc (showString "mut"), prt 9 expr])
     ExprLiteral literal -> prPrec i 10 (concatD [prt 0 literal])
     ExprIdent id -> prPrec i 10 (concatD [prt 0 id])
     ExprCall id sepexprlist -> prPrec i 10 (concatD [prt 0 id, doc (showString "("), prt 0 sepexprlist, doc (showString ")")])
@@ -121,7 +121,7 @@ instance Print Expr where
     ExprArrayElems markexprlist -> prPrec i 10 (concatD [doc (showString "["), prt 0 markexprlist, doc (showString "]")])
     ExprArrayRepeat expr n -> prPrec i 10 (concatD [doc (showString "["), prt 0 expr, doc (showString ";"), prt 0 n, doc (showString "]")])
     ExprArrayRange n1 n2 -> prPrec i 10 (concatD [doc (showString "["), prt 0 n1, doc (showString ".."), prt 0 n2, doc (showString "]")])
-    ExprTupleCons markexprlist -> prPrec i 10 (concatD [doc (showString "("), prt 0 markexprlist, doc (showString ")")])
+    ExprTuple markexprlist -> prPrec i 10 (concatD [doc (showString "("), prt 0 markexprlist, doc (showString ")")])
 
 instance Print SepExprList where
   prt i e = case e of
@@ -133,11 +133,11 @@ instance Print SepExprList where
 
 instance Print MarkExprList where
   prt i e = case e of
-    MarkENil -> prPrec i 0 (concatD [])
-    MarkEOne expr -> prPrec i 0 (concatD [prt 0 expr, doc (showString ",")])
-    MarkEMore expr markexprlist -> prPrec i 0 (concatD [prt 0 expr, doc (showString ","), prt 1 markexprlist])
-    MarkEHead expr -> prPrec i 1 (concatD [prt 0 expr])
-    MarkETail markexprlist expr -> prPrec i 1 (concatD [prt 1 markexprlist, doc (showString ","), prt 0 expr])
+    MarkExprNil -> prPrec i 0 (concatD [])
+    MarkExprOne expr -> prPrec i 0 (concatD [prt 0 expr, doc (showString ",")])
+    MarkExprMore expr markexprlist -> prPrec i 0 (concatD [prt 0 expr, doc (showString ","), prt 1 markexprlist])
+    MarkExprHead expr -> prPrec i 1 (concatD [prt 0 expr])
+    MarkExprTail markexprlist expr -> prPrec i 1 (concatD [prt 1 markexprlist, doc (showString ","), prt 0 expr])
 
 instance Print Type where
   prt i e = case e of
@@ -159,6 +159,7 @@ instance Print MarkTypeList where
 instance Print LetPattern where
   prt i e = case e of
     PatternIdent id -> prPrec i 0 (concatD [prt 0 id])
+    PatternMutIdent id -> prPrec i 0 (concatD [doc (showString "mut"), prt 0 id])
     PatternIgnore -> prPrec i 0 (concatD [doc (showString "_")])
     PatternTuple markletpatternlist -> prPrec i 0 (concatD [doc (showString "("), prt 0 markletpatternlist, doc (showString ")")])
 
@@ -169,11 +170,6 @@ instance Print MarkLetPatternList where
     MarkPatternMore letpattern markletpatternlist -> prPrec i 0 (concatD [prt 0 letpattern, doc (showString ","), prt 1 markletpatternlist])
     MarkPatternHead letpattern -> prPrec i 1 (concatD [prt 0 letpattern])
     MarkPatternTail markletpatternlist letpattern -> prPrec i 1 (concatD [prt 1 markletpatternlist, doc (showString ","), prt 0 letpattern])
-
-instance Print LetDecl where
-  prt i e = case e of
-    DeclLetType letpattern type_ expr -> prPrec i 0 (concatD [doc (showString "let"), prt 0 letpattern, doc (showString ":"), prt 0 type_, doc (showString "="), prt 0 expr, doc (showString ";")])
-    DeclLet letpattern expr -> prPrec i 0 (concatD [doc (showString "let"), prt 0 letpattern, doc (showString "="), prt 0 expr, doc (showString ";")])
 
 instance Print FunDecl where
   prt i e = case e of
@@ -201,23 +197,20 @@ instance Print IfStmt where
   prt i e = case e of
     IfStmt expr block -> prPrec i 0 (concatD [doc (showString "if"), prt 0 expr, prt 0 block])
 
-instance Print Loop where
-  prt i e = case e of
-    LoopInf block -> prPrec i 0 (concatD [doc (showString "loop"), prt 0 block])
-    LoopWhile expr block -> prPrec i 0 (concatD [doc (showString "while"), prt 0 expr, prt 0 block])
-    LoopForIterable id expr block -> prPrec i 0 (concatD [doc (showString "for"), prt 0 id, doc (showString "in"), prt 0 expr, prt 0 block])
-    LoopForRange id expr1 expr2 block -> prPrec i 0 (concatD [doc (showString "for"), prt 0 id, doc (showString "in"), prt 0 expr1, doc (showString ".."), prt 0 expr2, prt 0 block])
-
 instance Print Stmt where
   prt i e = case e of
-    StmtLet letdecl -> prPrec i 0 (concatD [prt 0 letdecl])
     StmtFnDecl fundecl -> prPrec i 0 (concatD [prt 0 fundecl])
     StmtExpr expr -> prPrec i 0 (concatD [prt 0 expr, doc (showString ";")])
     StmtBreak -> prPrec i 0 (concatD [doc (showString "break"), doc (showString ";")])
     StmtContinue -> prPrec i 0 (concatD [doc (showString "continue"), doc (showString ";")])
     StmtIf ifstmt -> prPrec i 0 (concatD [prt 0 ifstmt])
     StmtIfElse ifelse -> prPrec i 0 (concatD [prt 0 ifelse])
-    StmtLoop loop -> prPrec i 0 (concatD [prt 0 loop])
+    StmtLoop block -> prPrec i 0 (concatD [doc (showString "loop"), prt 0 block])
+    StmtWhile expr block -> prPrec i 0 (concatD [doc (showString "while"), prt 0 expr, prt 0 block])
+    StmtForIterable id expr block -> prPrec i 0 (concatD [doc (showString "for"), prt 0 id, doc (showString "in"), prt 0 expr, prt 0 block])
+    StmtForRange id expr1 expr2 block -> prPrec i 0 (concatD [doc (showString "for"), prt 0 id, doc (showString "in"), prt 0 expr1, doc (showString ".."), prt 0 expr2, prt 0 block])
+    StmtLetType letpattern type_ expr -> prPrec i 0 (concatD [doc (showString "let"), prt 0 letpattern, doc (showString ":"), prt 0 type_, doc (showString "="), prt 0 expr, doc (showString ";")])
+    StmtLet letpattern expr -> prPrec i 0 (concatD [doc (showString "let"), prt 0 letpattern, doc (showString "="), prt 0 expr, doc (showString ";")])
   prtList _ [] = (concatD [])
   prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
 instance Print Block where

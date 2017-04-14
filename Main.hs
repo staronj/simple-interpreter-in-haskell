@@ -2,16 +2,18 @@ module Main where
 
 import qualified System.Console.GetOpt as Opt
 import System.Environment (getArgs)
-import Control.Monad.Except
 import qualified AST;
-
+import Data.Tree;
+import Control.Monad;
 
 data Options = Options
  { optVerbose     :: Bool
+ , dumpAst        :: Bool
  } deriving Show
 
 defaultOptions    = Options
  { optVerbose     = False
+ , dumpAst        = False
  }
 
 {-
@@ -39,10 +41,13 @@ options =
 
 options :: [Opt.OptDescr (Options -> Options)]
 options =
- [  
+ [
    Opt.Option ['v']     ["verbose"]
      (Opt.NoArg (\ opts -> opts { optVerbose = True }))
      "verbose output on stderr"
+  ,Opt.Option ['d']     ["ast-dump"]
+     (Opt.NoArg (\ opts -> opts { dumpAst = True }))
+     "instead of interpreting program dump abstract syntax tree (before type checking)"
  ]
 
 compilerOpts :: [String] -> IO (Options, String)
@@ -52,10 +57,16 @@ compilerOpts argv =
       (_,_,errs) -> ioError (userError (concat errs ++ Opt.usageInfo header options))
   where header = "Usage: interpret [OPTIONS...] file"
 
+
+doStuff :: String -> IO ()
+doStuff file = let ast = AST.buildAST file in
+  case ast of
+    Right tree -> putStrLn $ AST.prettyPrint tree
+    Left err -> putStrLn err
+
 main :: IO ()
 main = do
   args <- getArgs
   (options, filePath) <- compilerOpts args
   file <- readFile filePath
-  let ast  = AST.buildAST file
-  print ast
+  doStuff file
