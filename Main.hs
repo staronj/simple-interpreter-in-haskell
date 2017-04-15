@@ -1,19 +1,24 @@
+-- Jakub Staroń, 2017
 module Main where
 
 import qualified System.Console.GetOpt as Opt
 import System.Environment (getArgs)
-import qualified AST;
-import Data.Tree;
-import Control.Monad;
+import qualified AST
+import Data.Tree
+import Control.Monad
+import Control.Monad.Except
+import FormatString
+import Compile
+import Data.Int
 
 data Options = Options
  { optVerbose     :: Bool
- , dumpAst        :: Bool
+ , optDumpAst        :: Bool
  } deriving Show
 
 defaultOptions    = Options
  { optVerbose     = False
- , dumpAst        = False
+ , optDumpAst        = False
  }
 
 {-
@@ -46,7 +51,7 @@ options =
      (Opt.NoArg (\ opts -> opts { optVerbose = True }))
      "verbose output on stderr"
   ,Opt.Option ['d']     ["ast-dump"]
-     (Opt.NoArg (\ opts -> opts { dumpAst = True }))
+     (Opt.NoArg (\ opts -> opts { optDumpAst = True }))
      "instead of interpreting program dump abstract syntax tree (before type checking)"
  ]
 
@@ -68,5 +73,18 @@ main :: IO ()
 main = do
   args <- getArgs
   (options, filePath) <- compilerOpts args
+  when (optVerbose options) $ putStrLn $ format "Reading file %0." [filePath]
   file <- readFile filePath
-  doStuff file
+  when (optVerbose options) $ putStrLn "Building AST."
+  let ast = AST.buildAST file
+  ast <- case ast of
+    Right ast -> (when (optDumpAst options) $ putStrLn $ AST.prettyPrint ast) >> return ast
+    Left err -> fail err
+  let program = compile ast
+  program <- case program of
+    Right program -> return program
+    Left err -> fail err
+  input <- getContents >>= (return.(map read).lines)
+  let output = program input
+  mapM_ print output
+

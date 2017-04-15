@@ -1,3 +1,5 @@
+-- Jakub Staroń, 2017
+
 module FormatString (format) where
 
 import Data.Char

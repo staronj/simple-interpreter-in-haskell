@@ -1,3 +1,5 @@
+-- Jakub Staroń, 2017
+
 {-# LANGUAGE GADTs, KindSignatures, DataKinds, Rank2Types #-}
 
 module AST where
