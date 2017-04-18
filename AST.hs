@@ -1,15 +1,15 @@
 -- Jakub Staroń, 2017
 
-{-# LANGUAGE GADTs, KindSignatures, DataKinds, Rank2Types #-}
+{-# LANGUAGE GADTs #-}
 
 module AST where
 
+import Data.List
+import Data.Tree
 import qualified AbsGrammar as Abs
 import qualified ParGrammar as Par
 import FormatString
 import ErrM
-import Data.List
-import Data.Tree
 
 -- Identifier type
 type Ident = String
@@ -34,9 +34,11 @@ instance Show Type where
     show (MutableReference t) =     format "&mut %0" [show t]
     show (Array t n) =              format "[%0; %1]" [show t, show n]
 
+-- Unit (void) type
 unit :: Type
 unit = Tuple []
 
+-- One and only one value of unit type.
 unitExpr :: Expr
 unitExpr = TupleConstruct []
 
@@ -122,7 +124,7 @@ data Block =
 
 -- Function Parameter
 data FunctionParameter =
-    FunctionParameter { ident :: Ident, valueType :: Type}
+    FunctionParameter { pident :: Ident, valueType :: Type}
     deriving (Eq)
 
 instance Show FunctionParameter where
@@ -130,11 +132,15 @@ instance Show FunctionParameter where
 
 -- Function declaration
 data FunctionDeclaration =
-    FunctionDeclaration Ident [FunctionParameter] Type Block
+  FunctionDeclaration
+  { fident :: Ident
+  , parameters :: [FunctionParameter]
+  , resultType :: Type
+  , block :: Block }
     deriving (Eq)
 
 -- Program
-data Program = Program [FunctionDeclaration]
+data Program = Program { functions :: [FunctionDeclaration] }
 
 buildAST :: String -> Either String Program
 buildAST str = let tokens = Par.myLexer str in

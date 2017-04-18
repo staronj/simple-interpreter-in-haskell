@@ -8,7 +8,7 @@ import Data.Tree
 import Control.Monad
 import Control.Monad.Except
 import FormatString
-import Compile
+import Interpret
 import Data.Int
 
 data Options = Options
@@ -62,13 +62,6 @@ compilerOpts argv =
       (_,_,errs) -> ioError (userError (concat errs ++ Opt.usageInfo header options))
   where header = "Usage: interpret [OPTIONS...] file"
 
-
-doStuff :: String -> IO ()
-doStuff file = let ast = AST.buildAST file in
-  case ast of
-    Right tree -> putStrLn $ AST.prettyPrint tree
-    Left err -> putStrLn err
-
 main :: IO ()
 main = do
   args <- getArgs
@@ -85,6 +78,7 @@ main = do
     Right program -> return program
     Left err -> fail err
   input <- getContents >>= (return.(map read).lines)
-  let output = program input
-  mapM_ print output
-
+  let output = execute program input
+  case output of
+    Right output -> mapM_ print output
+    Left (err, output) -> (mapM_ print output) >> (print err)
