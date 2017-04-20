@@ -86,8 +86,8 @@ data UnaryOperatorKind =
 
 -- Expr
 data Expr =
-    BinaryOperator  Expr BinaryOperatorKind Expr
-  | UnaryOperator   UnaryOperatorKind Expr
+    BinaryOperator  Expr Expr BinaryOperatorKind
+  | UnaryOperator   Expr UnaryOperatorKind
   | Identifier      Ident
   | LiteralExpr     Literal
 
@@ -175,26 +175,26 @@ buildBlock block = case block of
 
 buildExpr :: Abs.Expr -> Expr
 buildExpr expr = case expr of
-    Abs.Assign expr1 expr2                       -> BinaryOperator (buildExpr expr1) Assign (buildExpr expr2)
-    Abs.Or expr1 expr2                           -> BinaryOperator (buildExpr expr1) Or (buildExpr expr2)
-    Abs.And expr1 expr2                          -> BinaryOperator (buildExpr expr1) And (buildExpr expr2)
-    Abs.Equal expr1 expr2                        -> BinaryOperator (buildExpr expr1) Equal (buildExpr expr2)
-    Abs.NotEqual expr1 expr2                     -> BinaryOperator (buildExpr expr1) NotEqual (buildExpr expr2)
-    Abs.Less expr1 expr2                         -> BinaryOperator (buildExpr expr1) Less (buildExpr expr2)
-    Abs.Add expr1 expr2                          -> BinaryOperator (buildExpr expr1) Add (buildExpr expr2)
-    Abs.Subtract expr1 expr2                     -> BinaryOperator (buildExpr expr1) Subtract (buildExpr expr2)
-    Abs.Multiply expr1 expr2                     -> BinaryOperator (buildExpr expr1) Multiply (buildExpr expr2)
-    Abs.Divide expr1 expr2                       -> BinaryOperator (buildExpr expr1) Divide (buildExpr expr2)
-    Abs.Modulo expr1 expr2                       -> BinaryOperator (buildExpr expr1) Modulo (buildExpr expr2)
-    Abs.Negate expr                              -> UnaryOperator Negate (buildExpr expr)
-    Abs.Dereference expr                         -> UnaryOperator Dereference (buildExpr expr)
-    Abs.Not expr                                 -> UnaryOperator Not (buildExpr expr)
-    Abs.Borrow expr                              -> UnaryOperator Borrow (buildExpr expr)
-    Abs.MutableBorrow expr                       -> UnaryOperator MutableBorrow (buildExpr expr)
+    Abs.Assign expr1 expr2                       -> BinaryOperator (buildExpr expr1) (buildExpr expr2) Assign
+    Abs.Or expr1 expr2                           -> BinaryOperator (buildExpr expr1) (buildExpr expr2) Or
+    Abs.And expr1 expr2                          -> BinaryOperator (buildExpr expr1) (buildExpr expr2) And
+    Abs.Equal expr1 expr2                        -> BinaryOperator (buildExpr expr1) (buildExpr expr2) Equal
+    Abs.NotEqual expr1 expr2                     -> BinaryOperator (buildExpr expr1) (buildExpr expr2) NotEqual
+    Abs.Less expr1 expr2                         -> BinaryOperator (buildExpr expr1) (buildExpr expr2) Less
+    Abs.Add expr1 expr2                          -> BinaryOperator (buildExpr expr1) (buildExpr expr2) Add
+    Abs.Subtract expr1 expr2                     -> BinaryOperator (buildExpr expr1) (buildExpr expr2) Subtract
+    Abs.Multiply expr1 expr2                     -> BinaryOperator (buildExpr expr1) (buildExpr expr2) Multiply
+    Abs.Divide expr1 expr2                       -> BinaryOperator (buildExpr expr1) (buildExpr expr2) Divide
+    Abs.Modulo expr1 expr2                       -> BinaryOperator (buildExpr expr1) (buildExpr expr2) Modulo
+    Abs.Negate expr                              -> UnaryOperator (buildExpr expr) Negate
+    Abs.Dereference expr                         -> UnaryOperator (buildExpr expr) Dereference
+    Abs.Not expr                                 -> UnaryOperator (buildExpr expr) Not
+    Abs.Borrow expr                              -> UnaryOperator (buildExpr expr) Borrow
+    Abs.MutableBorrow expr                       -> UnaryOperator (buildExpr expr) MutableBorrow
     Abs.LiteralExpr literal                      -> LiteralExpr (buildLiteral literal)
     Abs.ExprIdent (Abs.Ident ident)              -> Identifier ident
     Abs.FunctionCall (Abs.Ident ident) sepExprList       -> FunctionCall ident $ map buildExpr (buildSepExprList sepExprList)
-    Abs.ArrayLookup expr1 expr2                  -> BinaryOperator (buildExpr expr1) ArrayLookup (buildExpr expr2)
+    Abs.ArrayLookup expr1 expr2                  -> BinaryOperator (buildExpr expr1) (buildExpr expr2) ArrayLookup
     Abs.TupleLookup expr integer                 -> TupleLookup (buildExpr expr) (fromIntegral integer)
     Abs.IfElseExpr (Abs.IfElse expr1 block1 block2)  -> IfElse (buildExpr expr1) (buildBlock block1) (buildBlock block2)
     Abs.BlockExpr block                              -> BlockExpr (buildBlock block)
@@ -313,8 +313,8 @@ stmtToTree stmt = case stmt of
 
 exprToTree :: Expr -> Tree String
 exprToTree expr = case expr of
-    BinaryOperator  expr1 kind expr2    -> Node "Binary operator"   [Node (show kind) [], exprToTree expr1, exprToTree expr2]
-    UnaryOperator   kind expr           -> Node "Unary operator"    [Node (show kind) [], exprToTree expr]
+    BinaryOperator  expr1 expr2 kind    -> Node "Binary operator"   [Node (show kind) [], exprToTree expr1, exprToTree expr2]
+    UnaryOperator   expr kind           -> Node "Unary operator"    [Node (show kind) [], exprToTree expr]
     Identifier      ident               -> Node "Identifier"        [Node ident []]
     LiteralExpr     literal             -> Node "Literal expr"      [Node (show literal) []]
     FunctionCall    ident exprs         -> Node "Function call"     $ Node ident [] : map exprToTree exprs
