@@ -6,6 +6,7 @@ module AST where
 
 import Data.List
 import Data.Tree
+import Data.Int
 import qualified AbsGrammar as Abs
 import qualified ParGrammar as Par
 import FormatString
@@ -21,7 +22,7 @@ data Type =
   | Tuple [Type]
   | Reference Type
   | MutableReference Type
-  | Array Type Integer
+  | Array Type Int32
   deriving (Eq)
 
 instance Show Type where
@@ -52,7 +53,7 @@ data Pattern =
 
 -- Literal
 data Literal =
-    LiteralI32 Integer
+    LiteralI32 Int32
   | LiteralBool Bool
   deriving (Eq)
 
@@ -91,11 +92,11 @@ data Expr =
   | LiteralExpr     Literal
 
   | FunctionCall    Ident [Expr]
-  | TupleLookup     Expr Integer
+  | TupleLookup     Expr Int32
 
   | ArrayElements   [Expr]
-  | ArrayRepeat     Expr Integer
-  | ArrayRange      Integer Integer
+  | ArrayRepeat     Expr Int32
+  | ArrayRange      Int32 Int32
   | TupleConstruct  [Expr]
   | BlockExpr       Block
 
@@ -194,12 +195,12 @@ buildExpr expr = case expr of
     Abs.ExprIdent (Abs.Ident ident)              -> Identifier ident
     Abs.FunctionCall (Abs.Ident ident) sepExprList       -> FunctionCall ident $ map buildExpr (buildSepExprList sepExprList)
     Abs.ArrayLookup expr1 expr2                  -> BinaryOperator (buildExpr expr1) ArrayLookup (buildExpr expr2)
-    Abs.TupleLookup expr integer                 -> TupleLookup (buildExpr expr) integer
+    Abs.TupleLookup expr integer                 -> TupleLookup (buildExpr expr) (fromIntegral integer)
     Abs.IfElseExpr (Abs.IfElse expr1 block1 block2)  -> IfElse (buildExpr expr1) (buildBlock block1) (buildBlock block2)
     Abs.BlockExpr block                              -> BlockExpr (buildBlock block)
     Abs.ArrayElements markExprList               -> ArrayElements $ map buildExpr (buildMarkExprList markExprList)
-    Abs.ArrayRepeat expr integer                 -> ArrayRepeat (buildExpr expr) integer
-    Abs.ArrayRange integer1 integer2             -> ArrayRange  integer1 integer2
+    Abs.ArrayRepeat expr integer                 -> ArrayRepeat (buildExpr expr) (fromIntegral integer)
+    Abs.ArrayRange integer1 integer2             -> ArrayRange  (fromIntegral integer1) (fromIntegral integer2)
     Abs.TupleConstruct markExprList              -> TupleConstruct $ map buildExpr (buildMarkExprList markExprList)
     where
         buildSepExprList :: Abs.SepExprList -> [Abs.Expr]
@@ -236,7 +237,7 @@ buildStmt stmt = case stmt of
 
 buildLiteral :: Abs.Literal -> Literal
 buildLiteral literal = case literal of
-    Abs.LiteralI32 n -> LiteralI32 n
+    Abs.LiteralI32 n -> LiteralI32 (fromIntegral n)
     Abs.LiteralBool (Abs.Boolean b) -> LiteralBool (b == "true")
 
 
@@ -262,7 +263,7 @@ buildType type' = case type' of
     Abs.I32             -> I32
     Abs.Reference type''      -> Reference (buildType type'')
     Abs.MutableReference type''   -> MutableReference (buildType type'')
-    Abs.Array type'' n  -> Array (buildType type'') n
+    Abs.Array type'' n  -> Array (buildType type'') (fromIntegral n)
     Abs.Tuple types     -> Tuple $ map buildType $ buildList types
     where
         buildList :: Abs.MarkTypeList -> [Abs.Type]
