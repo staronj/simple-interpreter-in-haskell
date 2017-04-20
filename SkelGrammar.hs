@@ -74,7 +74,7 @@ transTree t = case t of
   MarkPatternTail markpatternlist pattern -> failure t
   FunDecl ident sepparameterlist block -> failure t
   FunDeclType ident sepparameterlist type' block -> failure t
-  Parameter ident type' -> failure t
+  Parameter pattern type' -> failure t
   SepPNil  -> failure t
   SepPOne parameter -> failure t
   SepPMore parameter sepparameterlist -> failure t
@@ -192,7 +192,7 @@ transFunDecl t = case t of
 
 transParameter :: Parameter -> Result
 transParameter t = case t of
-  Parameter ident type' -> failure t
+  Parameter pattern type' -> failure t
 
 transSepParameterList :: SepParameterList -> Result
 transSepParameterList t = case t of

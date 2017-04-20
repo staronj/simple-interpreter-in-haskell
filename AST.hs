@@ -124,11 +124,8 @@ data Block =
 
 -- Function Parameter
 data FunctionParameter =
-    FunctionParameter { pident :: Ident, valueType :: Type}
+    FunctionParameter { pattern :: Pattern, valueType :: Type}
     deriving (Eq)
-
-instance Show FunctionParameter where
-    show (FunctionParameter ident valueType) = format "%0 of type %1" [ident, show valueType]
 
 -- Function declaration
 data FunctionDeclaration =
@@ -158,7 +155,7 @@ buildFunDecl funDecl = case funDecl of
     Abs.FunDeclType (Abs.Ident ident) parameterList returnType block    -> FunctionDeclaration ident (buildParameters parameterList) (buildType returnType) (buildBlock block)
     where
         buildParameter :: Abs.Parameter -> FunctionParameter
-        buildParameter (Abs.Parameter (Abs.Ident ident) valueType) = FunctionParameter ident (buildType valueType)
+        buildParameter (Abs.Parameter pattern valueType) = FunctionParameter (buildPattern pattern) (buildType valueType)
         buildParameters :: Abs.SepParameterList -> [FunctionParameter]
         buildParameters parameters = case parameters of
                 Abs.SepPNil         -> []
@@ -284,8 +281,13 @@ programToTree (Program funDecls) = Node "program" nodes where
 funDeclToTree :: FunctionDeclaration -> Tree String
 funDeclToTree (FunctionDeclaration ident parameters returnType block) =
     Node (format "declaration of function \"%0\"" [ident]) [parametersNode, returnTypeNode, blockToTree block] where
-        parametersNode = Node "parameters: " $ map (\s -> Node (show s) []) parameters
+        parametersNode = Node "parameters: " $ map parameterToTree parameters
         returnTypeNode = Node (format "return type \"%0\"" [show returnType]) []
+
+parameterToTree :: FunctionParameter -> Tree String
+parameterToTree parameter = Node "parameter" [patternNode, typeNode] where
+  patternNode = patternToTree (pattern parameter)
+  typeNode = Node (format "type \"%0\"" [show $ valueType parameter]) []
 
 blockToTree :: Block -> Tree String
 blockToTree (Block stmts expr) = Node "block" $ (map stmtToTree stmts) ++ [exprToTree expr]

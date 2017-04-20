@@ -91,7 +91,7 @@ data Tree :: Tag -> * where
     MarkPatternTail :: MarkPatternList -> Pattern -> Tree MarkPatternList_
     FunDecl :: Ident -> SepParameterList -> Block -> Tree FunDecl_
     FunDeclType :: Ident -> SepParameterList -> Type -> Block -> Tree FunDecl_
-    Parameter :: Ident -> Type -> Tree Parameter_
+    Parameter :: Pattern -> Type -> Tree Parameter_
     SepPNil :: Tree SepParameterList_
     SepPOne :: Parameter -> Tree SepParameterList_
     SepPMore :: Parameter -> SepParameterList -> Tree SepParameterList_
@@ -173,7 +173,7 @@ instance Compos Tree where
       MarkPatternTail markpatternlist pattern -> r MarkPatternTail `a` f markpatternlist `a` f pattern
       FunDecl ident sepparameterlist block -> r FunDecl `a` f ident `a` f sepparameterlist `a` f block
       FunDeclType ident sepparameterlist type' block -> r FunDeclType `a` f ident `a` f sepparameterlist `a` f type' `a` f block
-      Parameter ident type' -> r Parameter `a` f ident `a` f type'
+      Parameter pattern type' -> r Parameter `a` f pattern `a` f type'
       SepPOne parameter -> r SepPOne `a` f parameter
       SepPMore parameter sepparameterlist -> r SepPMore `a` f parameter `a` f sepparameterlist
       SepPHead parameter -> r SepPHead `a` f parameter
@@ -260,7 +260,7 @@ instance Show (Tree c) where
     MarkPatternTail markpatternlist pattern -> opar n . showString "MarkPatternTail" . showChar ' ' . showsPrec 1 markpatternlist . showChar ' ' . showsPrec 1 pattern . cpar n
     FunDecl ident sepparameterlist block -> opar n . showString "FunDecl" . showChar ' ' . showsPrec 1 ident . showChar ' ' . showsPrec 1 sepparameterlist . showChar ' ' . showsPrec 1 block . cpar n
     FunDeclType ident sepparameterlist type' block -> opar n . showString "FunDeclType" . showChar ' ' . showsPrec 1 ident . showChar ' ' . showsPrec 1 sepparameterlist . showChar ' ' . showsPrec 1 type' . showChar ' ' . showsPrec 1 block . cpar n
-    Parameter ident type' -> opar n . showString "Parameter" . showChar ' ' . showsPrec 1 ident . showChar ' ' . showsPrec 1 type' . cpar n
+    Parameter pattern type' -> opar n . showString "Parameter" . showChar ' ' . showsPrec 1 pattern . showChar ' ' . showsPrec 1 type' . cpar n
     SepPNil -> showString "SepPNil"
     SepPOne parameter -> opar n . showString "SepPOne" . showChar ' ' . showsPrec 1 parameter . cpar n
     SepPMore parameter sepparameterlist -> opar n . showString "SepPMore" . showChar ' ' . showsPrec 1 parameter . showChar ' ' . showsPrec 1 sepparameterlist . cpar n
@@ -354,7 +354,7 @@ johnMajorEq (MarkPatternHead pattern) (MarkPatternHead pattern_) = pattern == pa
 johnMajorEq (MarkPatternTail markpatternlist pattern) (MarkPatternTail markpatternlist_ pattern_) = markpatternlist == markpatternlist_ && pattern == pattern_
 johnMajorEq (FunDecl ident sepparameterlist block) (FunDecl ident_ sepparameterlist_ block_) = ident == ident_ && sepparameterlist == sepparameterlist_ && block == block_
 johnMajorEq (FunDeclType ident sepparameterlist type' block) (FunDeclType ident_ sepparameterlist_ type'_ block_) = ident == ident_ && sepparameterlist == sepparameterlist_ && type' == type'_ && block == block_
-johnMajorEq (Parameter ident type') (Parameter ident_ type'_) = ident == ident_ && type' == type'_
+johnMajorEq (Parameter pattern type') (Parameter pattern_ type'_) = pattern == pattern_ && type' == type'_
 johnMajorEq SepPNil SepPNil = True
 johnMajorEq (SepPOne parameter) (SepPOne parameter_) = parameter == parameter_
 johnMajorEq (SepPMore parameter sepparameterlist) (SepPMore parameter_ sepparameterlist_) = parameter == parameter_ && sepparameterlist == sepparameterlist_
@@ -536,7 +536,7 @@ compareSame (MarkPatternHead pattern) (MarkPatternHead pattern_) = compare patte
 compareSame (MarkPatternTail markpatternlist pattern) (MarkPatternTail markpatternlist_ pattern_) = mappend (compare markpatternlist markpatternlist_) (compare pattern pattern_)
 compareSame (FunDecl ident sepparameterlist block) (FunDecl ident_ sepparameterlist_ block_) = mappend (compare ident ident_) (mappend (compare sepparameterlist sepparameterlist_) (compare block block_))
 compareSame (FunDeclType ident sepparameterlist type' block) (FunDeclType ident_ sepparameterlist_ type'_ block_) = mappend (compare ident ident_) (mappend (compare sepparameterlist sepparameterlist_) (mappend (compare type' type'_) (compare block block_)))
-compareSame (Parameter ident type') (Parameter ident_ type'_) = mappend (compare ident ident_) (compare type' type'_)
+compareSame (Parameter pattern type') (Parameter pattern_ type'_) = mappend (compare pattern pattern_) (compare type' type'_)
 compareSame SepPNil SepPNil = EQ
 compareSame (SepPOne parameter) (SepPOne parameter_) = compare parameter parameter_
 compareSame (SepPMore parameter sepparameterlist) (SepPMore parameter_ sepparameterlist_) = mappend (compare parameter parameter_) (compare sepparameterlist sepparameterlist_)

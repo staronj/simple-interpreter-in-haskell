@@ -180,7 +180,7 @@ instance Print FunDecl where
   prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])
 instance Print Parameter where
   prt i e = case e of
-    Parameter id type_ -> prPrec i 0 (concatD [prt 0 id, doc (showString ":"), prt 0 type_])
+    Parameter pattern type_ -> prPrec i 0 (concatD [prt 0 pattern, doc (showString ":"), prt 0 type_])
 
 instance Print SepParameterList where
   prt i e = case e of

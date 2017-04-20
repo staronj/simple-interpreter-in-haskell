@@ -1,1 +1,1 @@
-bnfc -m --haskell-gadt ../grammar.bnfc  --outputdir=obj && happy -gca obj/ParGrammar.y && alex -g obj/LexGrammar.x && ghc -outputdir obj --make GrammarUnitTests.hs -o GrammarUnitTests && GrammarUnitTests.exe
+bnfc -m --haskell-gadt ../grammar.bnfc  --outputdir=obj && happy -gca obj/ParGrammar.y && alex -g obj/LexGrammar.x && mv obj/*.hs . && ghc -outputdir obj --make GrammarUnitTests.hs -o GrammarUnitTests && GrammarUnitTests.exe

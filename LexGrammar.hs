@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-binds -fno-warn-missing-signatures #-}
 {-# LANGUAGE CPP,MagicHash #-}
-{-# LINE 3 "LexGrammar.x" #-}
+{-# LINE 3 "obj/LexGrammar.x" #-}
 
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 {-# OPTIONS_GHC -w #-}
@@ -46,7 +46,7 @@ alex_accept = listArray (0::Int,28) [AlexAccNone,AlexAccNone,AlexAccNone,AlexAcc
 
 alex_actions = array (0::Int,15) [(14,alex_action_2),(13,alex_action_2),(12,alex_action_2),(11,alex_action_2),(10,alex_action_2),(9,alex_action_2),(8,alex_action_3),(7,alex_action_4),(6,alex_action_4),(5,alex_action_4),(4,alex_action_4),(3,alex_action_4),(2,alex_action_4),(1,alex_action_4),(0,alex_action_5)]
 
-{-# LINE 39 "LexGrammar.x" #-}
+{-# LINE 39 "obj/LexGrammar.x" #-}
 
 
 tok :: (Posn -> String -> Token) -> (Posn -> String -> Token)
