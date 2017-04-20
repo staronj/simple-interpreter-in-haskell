@@ -118,26 +118,29 @@ data Stmt =
   deriving (Eq)
 
 -- Block
-data Block =
-    Block [Stmt] Expr
+data Block = Block [Stmt] Expr
     deriving (Eq)
 
 -- Function Parameter
 data FunctionParameter =
-    FunctionParameter { pattern :: Pattern, valueType :: Type}
+    FunctionParameter
+    { pattern :: Pattern
+    , valueType :: Type}
     deriving (Eq)
 
 -- Function declaration
 data FunctionDeclaration =
   FunctionDeclaration
-  { fident :: Ident
+  { name :: Ident
   , parameters :: [FunctionParameter]
   , resultType :: Type
-  , block :: Block }
+  , body :: Block }
     deriving (Eq)
 
 -- Program
-data Program = Program { functions :: [FunctionDeclaration] }
+data Program =
+  Program
+  { functions :: [FunctionDeclaration] }
 
 buildAST :: String -> Either String Program
 buildAST str = let tokens = Par.myLexer str in

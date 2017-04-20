@@ -8,7 +8,7 @@ import Data.Tree
 import Control.Monad
 import Control.Monad.Except
 import FormatString
-import Interpret
+import Compile
 import Data.Int
 
 data Options = Options
