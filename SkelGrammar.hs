@@ -14,6 +14,7 @@ transTree :: Tree c -> Result
 transTree t = case t of
   LiteralBool boolean -> failure t
   LiteralI32 integer -> failure t
+  LiteralIdent ident -> failure t
   Assign expr0 expr1 -> failure t
   Or expr0 expr1 -> failure t
   And expr0 expr1 -> failure t
@@ -62,15 +63,15 @@ transTree t = case t of
   MarkTMore type' marktypelist -> failure t
   MarkTHead type' -> failure t
   MarkTTail marktypelist type' -> failure t
-  LetPatternVariable ident -> failure t
-  LetPatternMutableVariable ident -> failure t
-  LetPatternIgnore  -> failure t
-  LetPatternTuple markletpatternlist -> failure t
+  PatternVariable ident -> failure t
+  PatternMutableVariable ident -> failure t
+  PatternIgnore  -> failure t
+  PatternTuple markpatternlist -> failure t
   MarkPatternNil  -> failure t
-  MarkPatternOne letpattern -> failure t
-  MarkPatternMore letpattern markletpatternlist -> failure t
-  MarkPatternHead letpattern -> failure t
-  MarkPatternTail markletpatternlist letpattern -> failure t
+  MarkPatternOne pattern -> failure t
+  MarkPatternMore pattern markpatternlist -> failure t
+  MarkPatternHead pattern -> failure t
+  MarkPatternTail markpatternlist pattern -> failure t
   FunDecl ident sepparameterlist block -> failure t
   FunDeclType ident sepparameterlist type' block -> failure t
   Parameter ident type' -> failure t
@@ -91,8 +92,8 @@ transTree t = case t of
   While expr block -> failure t
   IterableForLoop ident expr block -> failure t
   RangeForLoop ident expr0 expr1 block2 -> failure t
-  LetStmtStrict letpattern type' expr -> failure t
-  LetStmt letpattern expr -> failure t
+  LetStmtStrict pattern type' expr -> failure t
+  LetStmt pattern expr -> failure t
   BlockStmt block -> failure t
   Block stmts -> failure t
   BlockWithValue stmts expr -> failure t
@@ -104,6 +105,7 @@ transLiteral :: Literal -> Result
 transLiteral t = case t of
   LiteralBool boolean -> failure t
   LiteralI32 integer -> failure t
+  LiteralIdent ident -> failure t
 
 transExpr :: Expr -> Result
 transExpr t = case t of
@@ -168,20 +170,20 @@ transMarkTypeList t = case t of
   MarkTHead type' -> failure t
   MarkTTail marktypelist type' -> failure t
 
-transLetPattern :: LetPattern -> Result
-transLetPattern t = case t of
-  LetPatternVariable ident -> failure t
-  LetPatternMutableVariable ident -> failure t
-  LetPatternIgnore  -> failure t
-  LetPatternTuple markletpatternlist -> failure t
+transPattern :: Pattern -> Result
+transPattern t = case t of
+  PatternVariable ident -> failure t
+  PatternMutableVariable ident -> failure t
+  PatternIgnore  -> failure t
+  PatternTuple markpatternlist -> failure t
 
-transMarkLetPatternList :: MarkLetPatternList -> Result
-transMarkLetPatternList t = case t of
+transMarkPatternList :: MarkPatternList -> Result
+transMarkPatternList t = case t of
   MarkPatternNil  -> failure t
-  MarkPatternOne letpattern -> failure t
-  MarkPatternMore letpattern markletpatternlist -> failure t
-  MarkPatternHead letpattern -> failure t
-  MarkPatternTail markletpatternlist letpattern -> failure t
+  MarkPatternOne pattern -> failure t
+  MarkPatternMore pattern markpatternlist -> failure t
+  MarkPatternHead pattern -> failure t
+  MarkPatternTail markpatternlist pattern -> failure t
 
 transFunDecl :: FunDecl -> Result
 transFunDecl t = case t of
@@ -220,8 +222,8 @@ transStmt t = case t of
   While expr block -> failure t
   IterableForLoop ident expr block -> failure t
   RangeForLoop ident expr0 expr1 block2 -> failure t
-  LetStmtStrict letpattern type' expr -> failure t
-  LetStmt letpattern expr -> failure t
+  LetStmtStrict pattern type' expr -> failure t
+  LetStmt pattern expr -> failure t
   BlockStmt block -> failure t
 
 transBlock :: Block -> Result

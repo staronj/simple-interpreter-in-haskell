@@ -92,6 +92,7 @@ instance Print Literal where
   prt i e = case e of
     LiteralBool boolean -> prPrec i 0 (concatD [prt 0 boolean])
     LiteralI32 n -> prPrec i 0 (concatD [prt 0 n])
+    LiteralIdent id -> prPrec i 0 (concatD [prt 0 id])
 
 instance Print Expr where
   prt i e = case e of
@@ -156,20 +157,20 @@ instance Print MarkTypeList where
     MarkTHead type_ -> prPrec i 1 (concatD [prt 0 type_])
     MarkTTail marktypelist type_ -> prPrec i 1 (concatD [prt 1 marktypelist, doc (showString ","), prt 0 type_])
 
-instance Print LetPattern where
+instance Print Pattern where
   prt i e = case e of
-    LetPatternVariable id -> prPrec i 0 (concatD [prt 0 id])
-    LetPatternMutableVariable id -> prPrec i 0 (concatD [doc (showString "mut"), prt 0 id])
-    LetPatternIgnore -> prPrec i 0 (concatD [doc (showString "_")])
-    LetPatternTuple markletpatternlist -> prPrec i 0 (concatD [doc (showString "("), prt 0 markletpatternlist, doc (showString ")")])
+    PatternVariable id -> prPrec i 0 (concatD [prt 0 id])
+    PatternMutableVariable id -> prPrec i 0 (concatD [doc (showString "mut"), prt 0 id])
+    PatternIgnore -> prPrec i 0 (concatD [doc (showString "_")])
+    PatternTuple markpatternlist -> prPrec i 0 (concatD [doc (showString "("), prt 0 markpatternlist, doc (showString ")")])
 
-instance Print MarkLetPatternList where
+instance Print MarkPatternList where
   prt i e = case e of
     MarkPatternNil -> prPrec i 0 (concatD [])
-    MarkPatternOne letpattern -> prPrec i 0 (concatD [prt 0 letpattern, doc (showString ",")])
-    MarkPatternMore letpattern markletpatternlist -> prPrec i 0 (concatD [prt 0 letpattern, doc (showString ","), prt 1 markletpatternlist])
-    MarkPatternHead letpattern -> prPrec i 1 (concatD [prt 0 letpattern])
-    MarkPatternTail markletpatternlist letpattern -> prPrec i 1 (concatD [prt 1 markletpatternlist, doc (showString ","), prt 0 letpattern])
+    MarkPatternOne pattern -> prPrec i 0 (concatD [prt 0 pattern, doc (showString ",")])
+    MarkPatternMore pattern markpatternlist -> prPrec i 0 (concatD [prt 0 pattern, doc (showString ","), prt 1 markpatternlist])
+    MarkPatternHead pattern -> prPrec i 1 (concatD [prt 0 pattern])
+    MarkPatternTail markpatternlist pattern -> prPrec i 1 (concatD [prt 1 markpatternlist, doc (showString ","), prt 0 pattern])
 
 instance Print FunDecl where
   prt i e = case e of
@@ -209,8 +210,8 @@ instance Print Stmt where
     While expr block -> prPrec i 0 (concatD [doc (showString "while"), prt 0 expr, prt 0 block])
     IterableForLoop id expr block -> prPrec i 0 (concatD [doc (showString "for"), prt 0 id, doc (showString "in"), prt 0 expr, prt 0 block])
     RangeForLoop id expr1 expr2 block -> prPrec i 0 (concatD [doc (showString "for"), prt 0 id, doc (showString "in"), prt 0 expr1, doc (showString ".."), prt 0 expr2, prt 0 block])
-    LetStmtStrict letpattern type_ expr -> prPrec i 0 (concatD [doc (showString "let"), prt 0 letpattern, doc (showString ":"), prt 0 type_, doc (showString "="), prt 0 expr, doc (showString ";")])
-    LetStmt letpattern expr -> prPrec i 0 (concatD [doc (showString "let"), prt 0 letpattern, doc (showString "="), prt 0 expr, doc (showString ";")])
+    LetStmtStrict pattern type_ expr -> prPrec i 0 (concatD [doc (showString "let"), prt 0 pattern, doc (showString ":"), prt 0 type_, doc (showString "="), prt 0 expr, doc (showString ";")])
+    LetStmt pattern expr -> prPrec i 0 (concatD [doc (showString "let"), prt 0 pattern, doc (showString "="), prt 0 expr, doc (showString ";")])
     BlockStmt block -> prPrec i 0 (concatD [prt 0 block])
   prtList _ [] = (concatD [])
   prtList _ (x:xs) = (concatD [prt 0 x, prt 0 xs])

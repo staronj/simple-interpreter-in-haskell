@@ -43,11 +43,11 @@ unitExpr :: Expr
 unitExpr = TupleConstruct []
 
 -- Let Pattern
-data LetPattern =
-    LetPatternVariable Ident
-  | LetPatternMutableVariable Ident
-  | LetPatternIgnore
-  | LetPatternTuple [LetPattern]
+data Pattern =
+    PatternVariable Ident
+  | PatternMutableVariable Ident
+  | PatternIgnore
+  | PatternTuple [Pattern]
   deriving (Eq)
 
 -- Literal
@@ -114,7 +114,7 @@ data Stmt =
   | RangeForLoop Ident Expr Expr Block
   | Break
   | Continue
-  | LetStmt LetPattern (Maybe Type) Expr
+  | LetStmt Pattern (Maybe Type) Expr
   deriving (Eq)
 
 -- Block
@@ -174,33 +174,33 @@ buildBlock block = case block of
 
 buildExpr :: Abs.Expr -> Expr
 buildExpr expr = case expr of
-    Abs.Assign expr1 expr2 ->                       BinaryOperator (buildExpr expr1) Assign (buildExpr expr2)
-    Abs.Or expr1 expr2 ->                           BinaryOperator (buildExpr expr1) Or (buildExpr expr2)
-    Abs.And expr1 expr2 ->                          BinaryOperator (buildExpr expr1) And (buildExpr expr2)
-    Abs.Equal expr1 expr2 ->                        BinaryOperator (buildExpr expr1) Equal (buildExpr expr2)
-    Abs.NotEqual expr1 expr2 ->                     BinaryOperator (buildExpr expr1) NotEqual (buildExpr expr2)
-    Abs.Less expr1 expr2 ->                         BinaryOperator (buildExpr expr1) Less (buildExpr expr2)
-    Abs.Add expr1 expr2 ->                          BinaryOperator (buildExpr expr1) Add (buildExpr expr2)
-    Abs.Subtract expr1 expr2 ->                     BinaryOperator (buildExpr expr1) Subtract (buildExpr expr2)
-    Abs.Multiply expr1 expr2 ->                     BinaryOperator (buildExpr expr1) Multiply (buildExpr expr2)
-    Abs.Divide expr1 expr2 ->                       BinaryOperator (buildExpr expr1) Divide (buildExpr expr2)
-    Abs.Modulo expr1 expr2 ->                       BinaryOperator (buildExpr expr1) Modulo (buildExpr expr2)
-    Abs.Negate expr ->                              UnaryOperator Negate (buildExpr expr)
-    Abs.Dereference expr ->                         UnaryOperator Dereference (buildExpr expr)
-    Abs.Not expr ->                                 UnaryOperator Not (buildExpr expr)
-    Abs.Borrow expr ->                              UnaryOperator Borrow (buildExpr expr)
-    Abs.MutableBorrow expr ->                       UnaryOperator MutableBorrow (buildExpr expr)
-    Abs.LiteralExpr literal ->                      LiteralExpr (buildLiteral literal)
-    Abs.ExprIdent (Abs.Ident ident) ->              Identifier ident
-    Abs.FunctionCall (Abs.Ident ident) sepExprList ->       FunctionCall ident $ map buildExpr (buildSepExprList sepExprList)
-    Abs.ArrayLookup expr1 expr2 ->                  BinaryOperator (buildExpr expr1) ArrayLookup (buildExpr expr2)
-    Abs.TupleLookup expr integer ->                 TupleLookup (buildExpr expr) integer
-    Abs.IfElseExpr (Abs.IfElse expr1 block1 block2) ->  IfElse (buildExpr expr1) (buildBlock block1) (buildBlock block2)
-    Abs.BlockExpr block ->                              BlockExpr (buildBlock block)
-    Abs.ArrayElements markExprList ->               ArrayElements $ map buildExpr (buildMarkExprList markExprList)
-    Abs.ArrayRepeat expr integer ->                 ArrayRepeat (buildExpr expr) integer
-    Abs.ArrayRange integer1 integer2 ->             ArrayRange  integer1 integer2
-    Abs.TupleConstruct markExprList ->              TupleConstruct $ map buildExpr (buildMarkExprList markExprList)
+    Abs.Assign expr1 expr2                       -> BinaryOperator (buildExpr expr1) Assign (buildExpr expr2)
+    Abs.Or expr1 expr2                           -> BinaryOperator (buildExpr expr1) Or (buildExpr expr2)
+    Abs.And expr1 expr2                          -> BinaryOperator (buildExpr expr1) And (buildExpr expr2)
+    Abs.Equal expr1 expr2                        -> BinaryOperator (buildExpr expr1) Equal (buildExpr expr2)
+    Abs.NotEqual expr1 expr2                     -> BinaryOperator (buildExpr expr1) NotEqual (buildExpr expr2)
+    Abs.Less expr1 expr2                         -> BinaryOperator (buildExpr expr1) Less (buildExpr expr2)
+    Abs.Add expr1 expr2                          -> BinaryOperator (buildExpr expr1) Add (buildExpr expr2)
+    Abs.Subtract expr1 expr2                     -> BinaryOperator (buildExpr expr1) Subtract (buildExpr expr2)
+    Abs.Multiply expr1 expr2                     -> BinaryOperator (buildExpr expr1) Multiply (buildExpr expr2)
+    Abs.Divide expr1 expr2                       -> BinaryOperator (buildExpr expr1) Divide (buildExpr expr2)
+    Abs.Modulo expr1 expr2                       -> BinaryOperator (buildExpr expr1) Modulo (buildExpr expr2)
+    Abs.Negate expr                              -> UnaryOperator Negate (buildExpr expr)
+    Abs.Dereference expr                         -> UnaryOperator Dereference (buildExpr expr)
+    Abs.Not expr                                 -> UnaryOperator Not (buildExpr expr)
+    Abs.Borrow expr                              -> UnaryOperator Borrow (buildExpr expr)
+    Abs.MutableBorrow expr                       -> UnaryOperator MutableBorrow (buildExpr expr)
+    Abs.LiteralExpr literal                      -> LiteralExpr (buildLiteral literal)
+    Abs.ExprIdent (Abs.Ident ident)              -> Identifier ident
+    Abs.FunctionCall (Abs.Ident ident) sepExprList       -> FunctionCall ident $ map buildExpr (buildSepExprList sepExprList)
+    Abs.ArrayLookup expr1 expr2                  -> BinaryOperator (buildExpr expr1) ArrayLookup (buildExpr expr2)
+    Abs.TupleLookup expr integer                 -> TupleLookup (buildExpr expr) integer
+    Abs.IfElseExpr (Abs.IfElse expr1 block1 block2)  -> IfElse (buildExpr expr1) (buildBlock block1) (buildBlock block2)
+    Abs.BlockExpr block                              -> BlockExpr (buildBlock block)
+    Abs.ArrayElements markExprList               -> ArrayElements $ map buildExpr (buildMarkExprList markExprList)
+    Abs.ArrayRepeat expr integer                 -> ArrayRepeat (buildExpr expr) integer
+    Abs.ArrayRange integer1 integer2             -> ArrayRange  integer1 integer2
+    Abs.TupleConstruct markExprList              -> TupleConstruct $ map buildExpr (buildMarkExprList markExprList)
     where
         buildSepExprList :: Abs.SepExprList -> [Abs.Expr]
         buildSepExprList exprs = case exprs of
@@ -219,19 +219,19 @@ buildExpr expr = case expr of
 
 buildStmt :: Abs.Stmt -> Stmt
 buildStmt stmt = case stmt of
-    Abs.FunDeclStmt funDecl ->                              FunDeclStmt (buildFunDecl funDecl)
-    Abs.Stmt expr ->                                        Stmt (buildExpr expr)
-    Abs.Break ->                                            Break
-    Abs.Continue ->                                         Continue
-    Abs.If (Abs.IfStmt expr block) ->                       If (buildExpr expr) (buildBlock block)
-    Abs.IfElseStmt (Abs.IfElse expr block1 block2) ->       StrictStmt $ IfElse (buildExpr expr) (buildBlock block1) (buildBlock block2)
-    Abs.Loop block ->                                       Loop (buildBlock block)
-    Abs.While expr block ->                                 While (buildExpr expr) (buildBlock block)
-    Abs.IterableForLoop (Abs.Ident ident) expr block ->     IterableForLoop ident (buildExpr expr) (buildBlock block)
+    Abs.FunDeclStmt funDecl                              -> FunDeclStmt (buildFunDecl funDecl)
+    Abs.Stmt expr                                        -> Stmt (buildExpr expr)
+    Abs.Break                                            -> Break
+    Abs.Continue                                         -> Continue
+    Abs.If (Abs.IfStmt expr block)                       -> If (buildExpr expr) (buildBlock block)
+    Abs.IfElseStmt (Abs.IfElse expr block1 block2)       -> StrictStmt $ IfElse (buildExpr expr) (buildBlock block1) (buildBlock block2)
+    Abs.Loop block                                       -> Loop (buildBlock block)
+    Abs.While expr block                                 -> While (buildExpr expr) (buildBlock block)
+    Abs.IterableForLoop (Abs.Ident ident) expr block     -> IterableForLoop ident (buildExpr expr) (buildBlock block)
     Abs.RangeForLoop (Abs.Ident ident) expr1 expr2 block -> RangeForLoop ident (buildExpr expr1) (buildExpr expr2) (buildBlock block)
-    Abs.LetStmtStrict letPattern valueType expr ->            LetStmt (buildLetPattern letPattern) (Just (buildType valueType)) (buildExpr expr)
-    Abs.LetStmt letPattern expr ->                          LetStmt (buildLetPattern letPattern) Nothing (buildExpr expr)
-    Abs.BlockStmt block ->                                  StrictStmt $ BlockExpr $ buildBlock block
+    Abs.LetStmtStrict pattern valueType expr             -> LetStmt (buildPattern pattern) (Just (buildType valueType)) (buildExpr expr)
+    Abs.LetStmt pattern expr                             -> LetStmt (buildPattern pattern) Nothing (buildExpr expr)
+    Abs.BlockStmt block                                  -> StrictStmt $ BlockExpr $ buildBlock block
 
 
 buildLiteral :: Abs.Literal -> Literal
@@ -240,14 +240,14 @@ buildLiteral literal = case literal of
     Abs.LiteralBool (Abs.Boolean b) -> LiteralBool (b == "true")
 
 
-buildLetPattern :: Abs.LetPattern -> LetPattern
-buildLetPattern pattern = case pattern of
-    Abs.LetPatternVariable (Abs.Ident ident)          -> LetPatternVariable ident
-    Abs.LetPatternMutableVariable (Abs.Ident ident)   -> LetPatternMutableVariable ident
-    Abs.LetPatternIgnore                           -> LetPatternIgnore
-    Abs.LetPatternTuple patterns                   -> LetPatternTuple $ map buildLetPattern (buildList patterns)
+buildPattern :: Abs.Pattern -> Pattern
+buildPattern pattern = case pattern of
+    Abs.PatternVariable (Abs.Ident ident)         -> PatternVariable ident
+    Abs.PatternMutableVariable (Abs.Ident ident)  -> PatternMutableVariable ident
+    Abs.PatternIgnore                             -> PatternIgnore
+    Abs.PatternTuple patterns                     -> PatternTuple $ map buildPattern (buildList patterns)
     where
-        buildList :: Abs.MarkLetPatternList -> [Abs.LetPattern]
+        buildList :: Abs.MarkPatternList -> [Abs.Pattern]
         buildList patterns = case patterns of
             Abs.MarkPatternNil        -> []
             Abs.MarkPatternOne p      -> [p]
@@ -302,8 +302,8 @@ stmtToTree stmt = case stmt of
     RangeForLoop ident expr1 expr2 block    -> Node "for in range" [Node (format "variable: \"%0\"" [ident]) [], exprToTree expr1, exprToTree expr2, blockToTree block]
     Break                                   -> Node "break" []
     Continue                                -> Node "continue" []
-    LetStmt letPattern Nothing expr           -> Node "let binding" [letPatternToTree letPattern, exprToTree expr]
-    LetStmt letPattern (Just valueType) expr  -> Node "let binding" [letPatternToTree letPattern, Node (format "type \"%0\"" [show valueType]) [], exprToTree expr]
+    LetStmt pattern Nothing expr            -> Node "let binding" [patternToTree pattern, exprToTree expr]
+    LetStmt pattern (Just valueType) expr   -> Node "let binding" [patternToTree pattern, Node (format "type \"%0\"" [show valueType]) [], exprToTree expr]
 
 exprToTree :: Expr -> Tree String
 exprToTree expr = case expr of
@@ -321,9 +321,9 @@ exprToTree expr = case expr of
     IfElse          expr block1 block2  -> Node "If else"           [exprToTree expr, blockToTree block1, blockToTree block2]
 
 
-letPatternToTree :: LetPattern -> Tree String
-letPatternToTree pattern = case pattern of
-    LetPatternVariable ident            -> Node ident []
-    LetPatternMutableVariable ident     -> Node ("mut " ++ ident) []
-    LetPatternIgnore                    -> Node "ignore" []
-    LetPatternTuple ps                  -> Node "tuple pattern" $ map letPatternToTree ps
+patternToTree :: Pattern -> Tree String
+patternToTree pattern = case pattern of
+    PatternVariable ident            -> Node ident []
+    PatternMutableVariable ident     -> Node ("mut " ++ ident) []
+    PatternIgnore                    -> Node "ignore" []
+    PatternTuple ps                  -> Node "tuple pattern" $ map patternToTree ps
