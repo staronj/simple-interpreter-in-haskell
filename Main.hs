@@ -1,15 +1,20 @@
 -- Jakub Staroń, 2017
 module Main where
 
+import Data.Int
+import Control.Monad
+import Control.Monad.Trans.Maybe
+import Control.Monad.Except
+import Data.Tree
+
 import qualified System.Console.GetOpt as Opt
 import System.Environment (getArgs)
+
 import qualified AST
-import Data.Tree
-import Control.Monad
-import Control.Monad.Except
 import FormatString
+import TypeCheck
 import Compile
-import Data.Int
+
 
 data Options = Options
  { optVerbose     :: Bool
@@ -63,22 +68,28 @@ compilerOpts argv =
   where header = "Usage: interpret [OPTIONS...] file"
 
 main :: IO ()
-main = do
-  args <- getArgs
-  (options, filePath) <- compilerOpts args
-  when (optVerbose options) $ putStrLn $ format "Reading file %0." [filePath]
-  file <- readFile filePath
-  when (optVerbose options) $ putStrLn "Building AST."
+main = liftM (maybe () id) . runMaybeT $ do
+  args <- liftIO $ getArgs
+  (options, filePath) <-  liftIO $ compilerOpts args
+  when (optVerbose options) $ liftIO $ putStrLn $ format "Reading file %0." [filePath]
+  file <-  liftIO $ readFile filePath
+  when (optVerbose options) $ liftIO $ putStrLn "Building AST."
   let ast = AST.buildAST file
   ast <- case ast of
-    Right ast -> (when (optDumpAst options) $ putStrLn $ AST.prettyPrint ast) >> return ast
-    Left err -> fail err
+    Right ast -> (when (optDumpAst options) $ (liftIO $ putStrLn $ AST.prettyPrint ast) >> mzero) >> return ast
+    Left err -> (liftIO $ putStrLn err) >> mzero
+  when (optVerbose options) $ liftIO $ putStrLn "Type checking."
+  case typeCheck ast of
+    Right _ -> return ()
+    Left err -> (liftIO $ putStrLn err) >> mzero
+  when (optVerbose options) $ liftIO $ putStrLn "Compiling into lambda."
   let program = compile ast
   program <- case program of
     Right program -> return program
-    Left err -> fail err
-  input <- getContents >>= (return.(map read).lines)
+    Left err -> (liftIO $ putStrLn err) >> mzero
+  input <- liftIO $ getContents >>= (return.(map read).lines)
+  when (optVerbose options) $ liftIO $ putStrLn "Executing."
   let output = execute program input
   case output of
-    Right output -> mapM_ print output
-    Left (err, output) -> (mapM_ print output) >> (print err)
+    Right output -> liftIO $ mapM_ print output
+    Left (err, output) -> liftIO $ (mapM_ print output) >> (print err)

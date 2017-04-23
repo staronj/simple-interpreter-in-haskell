@@ -8,9 +8,11 @@ import Data.List
 import Control.Monad
 import Control.Monad.Cont
 import qualified Data.Map.Lazy as Map
+import qualified Data.Map.Strict as MapStrict
 
 import qualified AST
 import RList
+import FormatString
 
 type Input = [Int32]
 type Output = RList Int32
@@ -23,8 +25,8 @@ mapInterrupt f (Left (err, v)) = Left (err, f v)
 mapInterrupt f (Right v) = Right (f v)
 
 type MemoryAddress = Int32
+type Memory = MapStrict.Map MemoryAddress Int32
 
-type Memory = Map.Map MemoryAddress Int32
 data State = State {input :: Input, output :: Output, memory :: Memory}
 
 type Continuation = MemoryAddress -> State -> Interruption String State
@@ -44,12 +46,15 @@ maybeToEither = flip maybe Right . Left
 
 memoryRead :: MemoryAddress -> Memory -> Int32
 memoryRead address memory =
-    case Map.lookup address memory of
-        Nothing -> error "Internal interpreter error: value not found under given adress"
+    case MapStrict.lookup address memory of
+        Nothing -> error "Internal interpreter error: value not found under given adress."
         Just v -> v
 
 memoryWrite :: MemoryAddress -> Int32 -> Memory -> Memory
-memoryWrite address value memory = Map.insert address value memory
+memoryWrite address value memory = MapStrict.insert address value memory
+
+liftMemory :: (Memory -> Memory) -> (State -> Interruption a State)
+liftMemory f state = let m = (memory state) in Right $ state { memory = f m }
 
 sizeOf ::  AST.Type -> Int32
 sizeOf valueType = case valueType of
@@ -72,6 +77,17 @@ memoryCopy valueType from to memory = case valueType of
     _                           -> memory' where
         value = memoryRead from memory
         memory' = memoryWrite to value memory
+
+findFunction :: AST.Ident -> FEnv -> Either String Function
+findFunction ident fenv = maybeToEither (format "Function \"%0\" not defined." [ident]) $ Map.lookup ident fenv
+
+assertFunctionArguments :: Function -> AST.Ident -> [AST.Type] -> Either String ()
+assertFunctionArguments function ident types = do
+    let types_length = length types
+    let parameters_length = length $ parameters function
+    unless (types_length == parameters_length) $ Left $ format "Function \"%0\": expected %1 arguments, got %2." [ident, show parameters_length, show types_length]
+    let equal t1 t2 = unless (t1 == t2) $ Left $ format "Could not match \"%0\" with \"%1\"." [show t1, show t2]
+    zipWithM_ equal types $ parameters function
 
 
 initialFEnv :: FEnv
@@ -96,19 +112,40 @@ identityContinuation :: Continuation
 identityContinuation memoryAddress state = Right state
 
 typeOf :: AST.Expr -> Either String AST.Type
-typeOf expr = undefined
+typeOf expr = case expr of
+    AST.BinaryOperator  expr1 expr2 kind    -> undefined
+    AST.UnaryOperator   expr kind           -> undefined
+    AST.Identifier      ident               -> undefined
+    AST.LiteralExpr     literal             -> undefined
+    AST.FunctionCall    ident exprs         -> undefined
+    AST.TupleLookup     expr index          -> undefined
+    AST.ArrayElements   exprs               -> undefined
+    AST.ArrayRepeat     expr count          -> do
+        valueType <- typeOf expr
+        return $ AST.Array valueType count
+    AST.ArrayRange      begin end           -> do
+        unless (begin < end) $ Left $ format "Expected nonempty range, got [%0..%1]" [show begin, show end]
+        return $ AST.Array AST.I32 (end - begin)
+    AST.TupleConstruct  exprs               -> do
+        types <- mapM typeOf exprs
+        return $ AST.Tuple types
+    AST.BlockExpr       (AST.Block _ expr)  -> typeOf expr
+    AST.IfElse          expr (AST.Block _ expr1) (AST.Block _ expr2)  -> do
+        type1 <- typeOf expr1
+        type2 <- typeOf expr2
+        unless (type1 == type2) $ Left $ format "\"if-else\": could not match \"%0\" with \"%1\"" [show type1, show type2]
+        return type1
 
 
 compile :: AST.Program -> Either String Program
 compile ast =
-    let fenv = initialFEnv in
     let functionDeclarations = AST.functions ast in
-    let fenv' = insertFunctions functionDeclarations fenv in
+    let fenv = insertFunctions functionDeclarations initialFEnv in
     do
-        sequence_ $ fmap body fenv'
-        main <- maybeToEither "main function not found" $ Map.lookup "main" fenv'
-        unless (parameters main == []) (Left "main function should not take any arguments")
-        unless (resultType main == AST.unit) (Left "main function should return '()' type")
+        sequence_ $ fmap body fenv
+        main <- findFunction "main" fenv
+        unless (parameters main == []) $ Left "\"main\" function must take no arguments."
+        unless (resultType main == AST.unit) $ Left "\"main\" function must return '()' type."
         body main
 
 insertFunctions :: [AST.FunctionDeclaration] -> FEnv -> FEnv
@@ -123,34 +160,24 @@ compileFunction function fenv =
     let venv = initialVEnv in
     let resultType = AST.resultType function in
     let parameters = map AST.valueType (AST.parameters function) in
-    let cont = compileBlockDummy (AST.body function) (Env fenv venv) in
+    let cont = do
+        (valueType, cont) <- compileBlock (AST.body function) (Env fenv venv)
+        unless (valueType == resultType) $ Left $ format "Function \"%0\": could not match type \"%1\" with result type \"%2\"." [AST.name function, show valueType, show resultType]
+        return cont in
     Function cont parameters resultType
 
-compileBlockDummy :: AST.Block -> Env -> Either String Continuation
-compileBlockDummy (AST.Block stmts expr) env =
-    do
-        readF <- maybeToEither "Could not find readI32" $ Map.lookup "readI32" (functions env)
-        writeF <- maybeToEither "Could not find writeI32" $ Map.lookup "writeI32" (functions env)
-        readF <- body readF
-        writeF <- body writeF
-        let cont address state = do
-                state' <- readF address state
-                writeF address state'
-        return cont
-
-compileBlock :: AST.Block -> Env -> Either String Continuation
+compileBlock :: AST.Block -> Env -> Either String (AST.Type, Continuation)
 compileBlock (AST.Block stmts expr) env =
     let functionDeclarations = [funDecl | AST.FunDeclStmt funDecl <- stmts] in
     let fenv = insertFunctions functionDeclarations (functions env) in
-    let env = env {functions = fenv} in
+    let env' = env {functions = fenv} in
     do
-        sequence_ $ fmap body (functions env)
-        (env', offset, cont1) <- compileStmtSequence stmts env
-        cont2 <- compileExpr expr env'
+        (env'', offset, cont1) <- compileStmtSequence stmts env'
+        (valueType, cont2) <- compileExpr expr env''
         let cont memoryAddress state = do
             state <- cont1 memoryAddress state
             cont2 (memoryAddress + offset) state
-        return cont
+        return (valueType, cont)
 
 compileStmtSequence :: [AST.Stmt] -> Env -> Either String (Env, Int32, Continuation)
 compileStmtSequence [] env = Right (env, 0, identityContinuation)
@@ -163,13 +190,33 @@ compileStmtSequence (stmt : stmts) env = do
     return (env'', offset + offset', cont)
 
 compileStmt :: AST.Stmt -> Env -> Either String (Env, Int32, Continuation)
-compileStmt stmt env = undefined
+compileStmt stmt env = case stmt of
+    AST.FunDeclStmt _       -> return (env, 0, identityContinuation)
+    AST.Stmt expr           -> do
+        (valueType, expr) <- compileExpr expr env
+        return (env, 0, expr)
+    _                       -> error "Not implemented."
 
-compileExpr :: AST.Expr -> Env -> Either String Continuation
-compileExpr expr env = undefined
+compileExpr :: AST.Expr -> Env -> Either String (AST.Type, Continuation)
+compileExpr expr env = case expr of
+    AST.LiteralExpr literal         -> do
+        case literal of
+            AST.LiteralI32 n    -> return (AST.I32, \address -> liftMemory $ memoryWrite address n)
+            AST.LiteralBool b   -> undefined
+    AST.FunctionCall ident exprs   -> do
+        function <- findFunction ident (functions env)
+        exprs <- mapM (flip compileExpr env) exprs
+        assertFunctionArguments function ident $ map fst exprs
+        let (Right fun_cont) = body function
+        let cont memoryAddress state = do
+            state <- (snd $ head exprs) memoryAddress state
+            fun_cont memoryAddress state
+        return (resultType function, cont)
+    AST.TupleConstruct exprs        -> return (AST.unit, identityContinuation)
+    _                               -> error "Not implemented."
 
 execute :: Program -> Input -> Interruption String Output
 execute program input =
     let memory = Map.empty in
     let state = State input Nil memory in
-    mapInterrupt (\( State _ output _) -> output) (program 0 state)
+    mapInterrupt (\( State _ output memory) -> memory `seq` output) (program 0 state)
