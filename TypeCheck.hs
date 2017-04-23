@@ -132,7 +132,10 @@ typeCheckStmt stmt env = case stmt of
         assertTypesEqual env blockType AST.unit
         return env
     AST.Stmt expr                               -> typeCheckExpr expr env >> return env
-    AST.StrictStmt expr                         -> undefined
+    AST.StrictStmt expr                         -> do
+        exprType <- liftM varType $ typeCheckExpr expr env
+        assertTypesEqual env exprType AST.unit
+        return env
     AST.Loop block                              -> undefined
     AST.While expr block                        -> do
         exprType <- liftM varType $ typeCheckExpr expr env
@@ -205,7 +208,13 @@ typeCheckExpr expr env = case expr of
         assertFunctionArguments env function ident types
         return $ Variable (resultType function) False
     AST.TupleLookup     expr integer        -> undefined
-    AST.ArrayElements   exprs               -> undefined
+    AST.ArrayElements   exprs               -> do
+        exprs <- mapM (flip typeCheckExpr env) exprs
+        exprs <- return $ map varType exprs
+        when (null exprs) $ error "Internal interpreter error: empty exprs list in AST.ArrayElements."
+        let commonType = head exprs
+        mapM_ (assertTypesEqual env commonType) exprs
+        return $ Variable (AST.Array commonType $ fromIntegral $ length exprs) False
     AST.ArrayRepeat     expr integer        -> do
         exprType <- liftM varType $ typeCheckExpr expr env
         return $ Variable (AST.Array exprType integer) False
@@ -214,5 +223,13 @@ typeCheckExpr expr env = case expr of
         variables <- mapM (flip typeCheckExpr env) exprs
         let types = map varType variables
         return $ Variable (AST.Tuple types) False
-    AST.BlockExpr       block               -> undefined
-    AST.IfElse          expr block1 block2  -> undefined
+    AST.BlockExpr       block               -> do
+        blockType <- typeCheckBlock block env
+        return $ Variable blockType False
+    AST.IfElse          expr block1 block2  -> do
+        exprType <- liftM varType $ typeCheckExpr expr env
+        blockType1 <- typeCheckBlock block1 env
+        blockType2 <- typeCheckBlock block1 env
+        assertTypesEqual env exprType AST.Bool
+        assertTypesEqual env blockType1 blockType2
+        return $ Variable blockType1 False
