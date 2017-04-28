@@ -16,7 +16,13 @@ type VEnv = Map.Map AST.Ident Variable
 data Function = Function { parameters :: [AST.Type], resultType :: AST.Type}
 type FEnv = Map.Map AST.Ident Function
 
-data Env = Env {functions :: FEnv, variables :: VEnv, path :: AST.Ident }
+newtype Path = Path [(String, String)]
+
+instance Show Path where
+  show (Path path) = intercalate "@" elems where
+    elems = map (\(a, b) -> format "%0:%1" [a, b]) path
+
+data Env = Env {functions :: FEnv, variables :: VEnv, path :: Path }
 
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither = flip maybe Right . Left
@@ -53,12 +59,17 @@ insertPattern pattern valueType env = case pattern of
                 (foldl' (>=>) return pairs) env
             _               -> Left $ format "could not match \"%0\" with tuple" [show valueType]
 
-pushSubpath :: AST.Ident -> AST.Ident -> Env -> Env
-pushSubpath nodeType name env = env { path = format "%0:%1@%2" [nodeType, name, path env]}
+pushSubpath :: String -> String -> Env -> Env
+pushSubpath nodeType name env = env { path = Path $ (nodeType, name) : oldPath} where
+  Path oldPath = path env
+
+setSubpath :: String -> String -> Env -> Env
+setSubpath nodeType name env = env { path = Path $ (nodeType, name) : oldPath} where
+  Path (_ : oldPath) = path env
 
 assertTypesEqual :: Env -> AST.Type -> AST.Type -> Either String ()
 assertTypesEqual env type1 type2 =
-    unless (type1 == type2) $ Left $ format "could not match type \"%0\" with type \"%1\"\nat %2" [show type1, show type2, path env]
+    unless (type1 == type2) $ Left $ format "could not match type \"%0\" with type \"%1\"\nat %2" [show type1, show type2, show $ path env]
 
 assertMutable :: Variable -> Either String ()
 assertMutable variable = unless (mutable variable) $ Left $ "expected mutable variable"
@@ -68,6 +79,10 @@ assertIsArray valueType = case valueType of
     AST.Array _ _   -> return ()
     _               -> Left $ format "can not index a value of type \"%0\"" [show valueType]
 
+assertIsTuple :: AST.Type -> Either String ()
+assertIsTuple valueType = case valueType of
+    AST.Tuple _ -> return ()
+    _           -> Left $ format "can not index a value of type \"%0\"" [show valueType]
 
 assertFunctionArguments :: Env -> Function -> AST.Ident -> [AST.Type] -> Either String ()
 assertFunctionArguments env function ident types = do
@@ -77,7 +92,7 @@ assertFunctionArguments env function ident types = do
     zipWithM_ (assertTypesEqual env) types $ parameters function
 
 initialEnv :: Env
-initialEnv = Env functions variables "#" where
+initialEnv = Env functions variables (Path []) where
     functions = Map.fromList [("readI32", readI32), ("writeI32", writeI32)]
     readI32 = Function { parameters = [], resultType = AST.I32 }
     writeI32 = Function { parameters = [AST.I32], resultType = AST.unit }
@@ -117,8 +132,9 @@ typeCheckBlock :: AST.Block -> Env -> Either String AST.Type
 typeCheckBlock (AST.Block stmts expr) env = do
         env <- return $ insertFunctions [funDecl | AST.FunDeclStmt funDecl <- stmts] env
         env <- return $ pushSubpath "block" "0" env
+        env <- return $ pushSubpath "" "" env
         stmts <- return $ map typeCheckStmt stmts
-        stmts <- return $ zipWith (\i s -> s . pushSubpath "stmt" (show i)) [0..] stmts
+        stmts <- return $ zipWith (\i s -> s . setSubpath "stmt" (show i)) [0..] stmts
         env <- (foldl' (>=>) return stmts) env
         liftM varType $ typeCheckExpr expr env
 
@@ -136,14 +152,24 @@ typeCheckStmt stmt env = case stmt of
         exprType <- liftM varType $ typeCheckExpr expr env
         assertTypesEqual env exprType AST.unit
         return env
-    AST.Loop block                              -> undefined
+    AST.Loop block                              -> do
+        blockType <- typeCheckBlock block env
+        assertTypesEqual env blockType AST.unit
+        return env
     AST.While expr block                        -> do
         exprType <- liftM varType $ typeCheckExpr expr env
         blockType <- typeCheckBlock block env
         assertTypesEqual env exprType AST.Bool
         assertTypesEqual env blockType AST.unit
         return env
-    AST.IterableForLoop ident expr block        -> undefined
+    AST.IterableForLoop ident expr block        -> do
+        exprType <- liftM varType $ typeCheckExpr expr env
+        assertIsArray exprType
+        let AST.Array valueType _ = exprType
+        let env' = insertVariable ident (Variable { varType = valueType, mutable = False }) env
+        blockType <- typeCheckBlock block env'
+        assertTypesEqual env blockType AST.unit
+        return env
     AST.RangeForLoop ident expr1 expr2 block    -> do
         exprType1 <- liftM varType $ typeCheckExpr expr1 env
         exprType2 <- liftM varType $ typeCheckExpr expr2 env
@@ -153,8 +179,10 @@ typeCheckStmt stmt env = case stmt of
         assertTypesEqual env exprType2 AST.I32
         assertTypesEqual env blockType AST.unit
         return env
-    AST.Break                                   -> undefined
-    AST.Continue                                -> undefined
+    AST.Break                                   -> do
+        return env
+    AST.Continue                                -> do
+        return env
     AST.LetStmt pattern valueType expr          -> do
         exprType <- liftM varType $ typeCheckExpr expr env
         case valueType of
@@ -195,7 +223,20 @@ typeCheckExpr expr env = case expr of
                 assertTypesEqual env exprType2 AST.I32
                 let AST.Array valueType _ = exprType1
                 return $ exprVar1 { varType = valueType }
-    AST.UnaryOperator   expr kind           -> undefined
+    AST.UnaryOperator   expr kind           -> do
+        exprVar <- typeCheckExpr expr env
+        let exprType = varType exprVar
+        case kind of
+            AST.Negate -> do
+                assertTypesEqual env exprType AST.I32
+                return $ Variable AST.I32 False
+            AST.Dereference -> undefined
+            AST.Not -> do
+                assertTypesEqual env exprType AST.Bool
+                return $ Variable AST.Bool False
+            AST.Borrow -> undefined
+            AST.MutableBorrow -> undefined
+
     AST.Identifier      ident               -> findVariable ident env
     AST.LiteralExpr     literal             -> do
         case literal of
@@ -207,7 +248,13 @@ typeCheckExpr expr env = case expr of
         function <- findFunction ident env
         assertFunctionArguments env function ident types
         return $ Variable (resultType function) False
-    AST.TupleLookup     expr integer        -> undefined
+    AST.TupleLookup     expr n        -> do
+      exprVar <- typeCheckExpr expr env
+      let exprType = varType exprVar
+      assertIsTuple exprType
+      let AST.Tuple types = exprType
+      unless (length types > fromIntegral n) $ Left $ format "attempted out-of-bounds tuple index `%0` on type `%1`" [show n, show exprType]
+      return $ exprVar { varType = types !! fromIntegral n }
     AST.ArrayElements   exprs               -> do
         exprs <- mapM (flip typeCheckExpr env) exprs
         exprs <- return $ map varType exprs
@@ -218,7 +265,9 @@ typeCheckExpr expr env = case expr of
     AST.ArrayRepeat     expr integer        -> do
         exprType <- liftM varType $ typeCheckExpr expr env
         return $ Variable (AST.Array exprType integer) False
-    AST.ArrayRange      integer1 integer2   -> undefined
+    AST.ArrayRange      begin end           -> do
+        unless (begin < end) $ Left $ format "trying to create array from invalid range `(%0, %1)`" [show begin, show end]
+        return $ Variable (AST.Array AST.I32 (end - begin)) False
     AST.TupleConstruct  exprs               -> do
         variables <- mapM (flip typeCheckExpr env) exprs
         let types = map varType variables
@@ -229,7 +278,7 @@ typeCheckExpr expr env = case expr of
     AST.IfElse          expr block1 block2  -> do
         exprType <- liftM varType $ typeCheckExpr expr env
         blockType1 <- typeCheckBlock block1 env
-        blockType2 <- typeCheckBlock block1 env
+        blockType2 <- typeCheckBlock block2 env
         assertTypesEqual env exprType AST.Bool
         assertTypesEqual env blockType1 blockType2
         return $ Variable blockType1 False
