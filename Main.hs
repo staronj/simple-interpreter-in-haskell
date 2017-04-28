@@ -23,7 +23,7 @@ data Options = Options
 
 defaultOptions    = Options
  { optVerbose     = False
- , optDumpAst        = False
+ , optDumpAst     = False
  }
 
 {-
@@ -79,8 +79,8 @@ main = liftM (maybe () id) . runMaybeT $ do
     Right ast -> (when (optDumpAst options) $ (liftIO $ putStrLn $ AST.prettyPrint ast) >> mzero) >> return ast
     Left err -> (liftIO $ putStrLn err) >> mzero
   when (optVerbose options) $ liftIO $ putStrLn "Type checking."
-  case typeCheck ast of
-    Right _ -> return ()
+  ast <- case typeCheck ast of
+    Right ast -> return ast
     Left err -> (liftIO $ putStrLn err) >> mzero
   when (optVerbose options) $ liftIO $ putStrLn "Compiling into lambda."
   let program = compile ast

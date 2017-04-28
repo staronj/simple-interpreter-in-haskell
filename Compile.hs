@@ -13,6 +13,7 @@ import qualified Data.Map.Strict as MapStrict
 import qualified AST
 import RList
 import FormatString
+import TypeCheck(TypeCheckedProgram)
 
 type Input = [Int32]
 type Output = RList Int32
@@ -137,8 +138,8 @@ typeOf expr = case expr of
         return type1
 
 
-compile :: AST.Program -> Either String Program
-compile ast =
+compile :: TypeCheckedProgram -> Either String Program
+compile (TypeCheckedProgram ast) =
     let functionDeclarations = AST.functions ast in
     let fenv = insertFunctions functionDeclarations initialFEnv in
     do

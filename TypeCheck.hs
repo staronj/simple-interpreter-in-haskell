@@ -6,9 +6,15 @@ import Data.Int
 import Data.List
 import Control.Monad
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 
 import qualified AST
 import FormatString
+
+findDuplicate :: Ord a => [a] -> Maybe a
+findDuplicate xs = either Just (const Nothing) $ foldM insert Set.empty xs where
+    insert :: Ord a => Set.Set a -> a -> Either a (Set.Set a)
+    insert s x = if Set.member x s then Left x else Right $ Set.insert x s
 
 data Variable = Variable { varType :: AST.Type, mutable :: Bool }
 type VEnv = Map.Map AST.Ident Variable
@@ -23,6 +29,8 @@ instance Show Path where
     elems = map (\(a, b) -> format "%0:%1" [a, b]) path
 
 data Env = Env {functions :: FEnv, variables :: VEnv, path :: Path }
+
+newtype TypeCheckedProgram = TypeCheckedProgram AST.Program
 
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither = flip maybe Right . Left
@@ -98,26 +106,30 @@ initialEnv = Env functions variables (Path []) where
     writeI32 = Function { parameters = [AST.I32], resultType = AST.unit }
     variables = Map.empty
 
-typeCheck :: AST.Program -> Either String ()
+typeCheck :: AST.Program -> Either String TypeCheckedProgram
 typeCheck ast =
     let functionDeclarations = AST.functions ast in
-    let env = insertFunctions functionDeclarations initialEnv in
     do
+        env <- insertFunctions functionDeclarations initialEnv
         sequence_ $ map (flip typeCheckFunction env) functionDeclarations
         main <- findFunction "main" env
         unless (parameters main == []) $ Left "\"main\" function must take no arguments"
         unless (resultType main == AST.unit) $ Left "\"main\" function must return '()' type"
-        return ()
+        return $ TypeCheckedProgram ast
 
-insertFunctions :: [AST.FunctionDeclaration] -> Env -> Env
+insertFunctions :: [AST.FunctionDeclaration] -> Env -> Either String Env
 insertFunctions functions env =
-    foldl' (flip insertASTFunction) env functions where
-        insertASTFunction :: AST.FunctionDeclaration -> Env -> Env
-        insertASTFunction function = insertFunction ident function' where
-            ident = AST.name function
-            function' = Function parameters resultType
-            parameters = map AST.valueType (AST.parameters function)
-            resultType = AST.resultType function
+    let duplicateName = findDuplicate $ map AST.name functions in
+    do
+        maybe (return ()) ( \name -> Left $ format "duplicated definitions of function \"%0\" at\n%1" [name, show $ path env] ) duplicateName
+        return $ foldl' (flip insertASTFunction) env functions
+        where
+          insertASTFunction :: AST.FunctionDeclaration -> Env -> Env
+          insertASTFunction function = insertFunction ident function' where
+              ident = AST.name function
+              function' = Function parameters resultType
+              parameters = map AST.valueType (AST.parameters function)
+              resultType = AST.resultType function
 
 typeCheckFunction :: AST.FunctionDeclaration -> Env -> Either String ()
 typeCheckFunction fun env = do
@@ -130,7 +142,7 @@ typeCheckFunction fun env = do
 
 typeCheckBlock :: AST.Block -> Env -> Either String AST.Type
 typeCheckBlock (AST.Block stmts expr) env = do
-        env <- return $ insertFunctions [funDecl | AST.FunDeclStmt funDecl <- stmts] env
+        env <- insertFunctions [funDecl | AST.FunDeclStmt funDecl <- stmts] env
         env <- return $ pushSubpath "block" "0" env
         env <- return $ pushSubpath "" "" env
         stmts <- return $ map typeCheckStmt stmts
@@ -203,9 +215,6 @@ typeCheckExpr expr env = case expr of
                 assertTypesEqual env exprType1 AST.Bool
                 assertTypesEqual env exprType2 AST.Bool
                 return $ Variable AST.Bool False
-            _ | kind `elem` [AST.Equal, AST.NotEqual] -> do
-                assertTypesEqual env exprType1 exprType2
-                return $ Variable AST.Bool False
             AST.Less -> do
                 assertTypesEqual env exprType1 AST.I32
                 assertTypesEqual env exprType2 AST.I32
@@ -214,15 +223,6 @@ typeCheckExpr expr env = case expr of
                 assertTypesEqual env exprType1 AST.I32
                 assertTypesEqual env exprType2 AST.I32
                 return $ Variable AST.I32 False
-            AST.Assign -> do
-                assertMutable exprVar1
-                assertTypesEqual env exprType2 exprType1
-                return $ Variable AST.unit False
-            AST.ArrayLookup -> do
-                assertIsArray exprType1
-                assertTypesEqual env exprType2 AST.I32
-                let AST.Array valueType _ = exprType1
-                return $ exprVar1 { varType = valueType }
     AST.UnaryOperator   expr kind           -> do
         exprVar <- typeCheckExpr expr env
         let exprType = varType exprVar
@@ -230,14 +230,39 @@ typeCheckExpr expr env = case expr of
             AST.Negate -> do
                 assertTypesEqual env exprType AST.I32
                 return $ Variable AST.I32 False
-            AST.Dereference -> undefined
             AST.Not -> do
                 assertTypesEqual env exprType AST.Bool
                 return $ Variable AST.Bool False
-            AST.Borrow -> undefined
-            AST.MutableBorrow -> undefined
 
     AST.Identifier      ident               -> findVariable ident env
+    AST.Equal expr1 expr2                   -> do
+      exprType1 <- liftM varType $ typeCheckExpr expr1 env
+      exprType2 <- liftM varType $ typeCheckExpr expr2 env
+      return $ Variable AST.Bool False
+    AST.NotEqual expr1 expr2                   -> do
+        exprType1 <- liftM varType $ typeCheckExpr expr1 env
+        exprType2 <- liftM varType $ typeCheckExpr expr2 env
+        return $ Variable AST.Bool False
+    AST.Assign expr1 expr2 -> do
+        exprVar1 <- typeCheckExpr expr1 env
+        exprVar2 <- typeCheckExpr expr2 env
+        let exprType1 = varType exprVar1
+        let exprType2 = varType exprVar2
+        assertMutable exprVar1
+        assertTypesEqual env exprType2 exprType1
+        return $ Variable AST.unit False
+    AST.ArrayLookup expr1 expr2 -> do
+        exprVar1 <- typeCheckExpr expr1 env
+        exprVar2 <- typeCheckExpr expr2 env
+        let exprType1 = varType exprVar1
+        let exprType2 = varType exprVar2
+        assertIsArray exprType1
+        assertTypesEqual env exprType2 AST.I32
+        let AST.Array valueType _ = exprType1
+        return $ exprVar1 { varType = valueType }
+    AST.Dereference expr -> undefined
+    AST.Borrow expr -> undefined
+    AST.MutableBorrow expr -> undefined
     AST.LiteralExpr     literal             -> do
         case literal of
             AST.LiteralI32 _    -> return $ Variable AST.I32 False
