@@ -6,3 +6,4 @@
 *.y
 TestGrammar.hs
 obj/
+parser/
