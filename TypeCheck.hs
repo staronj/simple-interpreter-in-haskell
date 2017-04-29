@@ -2,8 +2,8 @@
 
 module TypeCheck (typeCheck) where
 
-import Data.Int
-import Data.List
+import Data.Int (Int32)
+import Data.List (foldl', intercalate)
 import Control.Monad
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -13,13 +13,13 @@ import FormatString
 
 findDuplicate :: Ord a => [a] -> Maybe a
 findDuplicate xs = either Just (const Nothing) $ foldM insert Set.empty xs where
-    insert :: Ord a => Set.Set a -> a -> Either a (Set.Set a)
-    insert s x = if Set.member x s then Left x else Right $ Set.insert x s
+  insert :: Ord a => Set.Set a -> a -> Either a (Set.Set a)
+  insert s x = if Set.member x s then Left x else Right $ Set.insert x s
 
 data Variable = Variable { varType :: AST.Type, mutable :: Bool }
-type VEnv = Map.Map AST.Ident Variable
-
 data Function = Function { parameters :: [AST.Type], resultType :: AST.Type}
+
+type VEnv = Map.Map AST.Ident Variable
 type FEnv = Map.Map AST.Ident Function
 
 newtype Path = Path [(String, String)]
@@ -28,44 +28,57 @@ instance Show Path where
   show (Path path) = intercalate "@" elems where
     elems = map (\(a, b) -> format "%0:%1" [a, b]) path
 
-data Env = Env {functions :: FEnv, variables :: VEnv, path :: Path }
+data Env =
+  Env
+  { functions :: FEnv
+  , variables :: VEnv
+  , path :: Path
+  , inLoop :: Bool }
 
 newtype TypeCheckedProgram = TypeCheckedProgram AST.Program
 
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither = flip maybe Right . Left
 
+
+-- Error Messages
+-- functionNotFoundMessage :: Env -> AST.Ident -> String
+-- functionNotFound env name = format "cannot find function `%0` in scope\n%1" [name, show $ path env]
+
+-- Error Messages End
+
+
 findFunction :: AST.Ident -> Env -> Either String Function
-findFunction ident env = maybeToEither (format "cannot find function `%0` in this scope" [ident]) $ Map.lookup ident $ functions env
+findFunction name env = maybeToEither message $ Map.lookup name $ functions env where
+  message = format "cannot find function `%0` in this scope" [name]
 
 findVariable :: AST.Ident -> Env -> Either String Variable
-findVariable ident env = maybeToEither (format "cannot find value `%0` in this scope" [ident]) $ Map.lookup ident $ variables env
+findVariable name env = maybeToEither message $ Map.lookup name $ variables env where
+  message = format "cannot find value `%0` in this scope" [name]
 
 insertFunction :: AST.Ident -> Function -> Env -> Env
-insertFunction ident function env = env' where
-    env' = env { functions = functions' }
-    functions' = Map.insert ident function (functions env)
+insertFunction name function env = env' where
+  env' = env { functions = functions' }
+  functions' = Map.insert name function $ functions env
 
 insertVariable :: AST.Ident -> Variable -> Env -> Env
-insertVariable ident variable env = env' where
-    env' = env { variables = variables' }
-    variables' = Map.insert ident variable (variables env)
-
+insertVariable name variable env = env' where
+  env' = env { variables = variables' }
+  variables' = Map.insert name variable $ variables env
 
 insertPattern :: AST.Pattern -> AST.Type -> Env -> Either String Env
 insertPattern pattern valueType env = case pattern of
-    AST.PatternVariable name            -> return $ insertVariable name (Variable valueType False) env
-    AST.PatternMutableVariable name     -> return $ insertVariable name (Variable valueType True) env
-    AST.PatternIgnore                   -> return env
-    AST.PatternTuple pattern'           ->
-        case valueType of
-            AST.Tuple types -> do
-                let pattern_length = length pattern'
-                let types_length = length types
-                unless (pattern_length == types_length) $ Left $ format "could not match tuple of %0 elements with tuple of %1 elements" [show types_length, show pattern_length]
-                let pairs = map (uncurry insertPattern) $ zip pattern' types
-                (foldl' (>=>) return pairs) env
-            _               -> Left $ format "could not match \"%0\" with tuple" [show valueType]
+  AST.PatternVariable name            -> return $ insertVariable name (Variable valueType False) env
+  AST.PatternMutableVariable name     -> return $ insertVariable name (Variable valueType True) env
+  AST.PatternIgnore                   -> return env
+  AST.PatternTuple pattern'           -> case valueType of
+    AST.Tuple types -> do
+      let pattern_length = length pattern'
+      let types_length = length types
+      unless (pattern_length == types_length) $ Left $ format "could not match tuple of %0 elements with tuple of %1 elements" [show types_length, show pattern_length]
+      let pairs = map (uncurry insertPattern) $ zip pattern' types
+      foldl' (>=>) return pairs env
+    _               -> Left $ format "could not match '%0' with tuple" [show valueType]
 
 pushSubpath :: String -> String -> Env -> Env
 pushSubpath nodeType name env = env { path = Path $ (nodeType, name) : oldPath} where
@@ -77,30 +90,30 @@ setSubpath nodeType name env = env { path = Path $ (nodeType, name) : oldPath} w
 
 assertTypesEqual :: Env -> AST.Type -> AST.Type -> Either String ()
 assertTypesEqual env type1 type2 =
-    unless (type1 == type2) $ Left $ format "could not match type \"%0\" with type \"%1\"\nat %2" [show type1, show type2, show $ path env]
+  unless (type1 == type2) $ Left $ format "could not match type '%0' with type '%1'\nat %2" [show type1, show type2, show $ path env]
 
-assertMutable :: Variable -> Either String ()
-assertMutable variable = unless (mutable variable) $ Left $ "expected mutable variable"
+assertMutable :: Env -> Variable -> Either String ()
+assertMutable env variable = unless (mutable variable) $ Left $ format "expected mutable variable\nat%0" [show $ path env]
 
-assertIsArray :: AST.Type -> Either String ()
-assertIsArray valueType = case valueType of
-    AST.Array _ _   -> return ()
-    _               -> Left $ format "can not index a value of type \"%0\"" [show valueType]
+assertIsArray :: Env -> AST.Type -> Either String ()
+assertIsArray env valueType = case valueType of
+    AST.Array {}  -> return ()
+    _             -> Left $ format "expected array, not a value of type '%0'\nat%1" [show valueType, show $ path env]
 
-assertIsTuple :: AST.Type -> Either String ()
-assertIsTuple valueType = case valueType of
-    AST.Tuple _ -> return ()
-    _           -> Left $ format "can not index a value of type \"%0\"" [show valueType]
+assertIsTuple :: Env -> AST.Type -> Either String ()
+assertIsTuple env valueType = case valueType of
+    AST.Tuple {}  -> return ()
+    _             -> Left $ format "expected tuple, not a value of type '%0'\nat%1" [show valueType, show $ path env]
 
 assertFunctionArguments :: Env -> Function -> AST.Ident -> [AST.Type] -> Either String ()
 assertFunctionArguments env function ident types = do
     let types_length = length types
     let parameters_length = length $ parameters function
-    unless (types_length == parameters_length) $ Left $ format "Function \"%0\": expected %1 arguments, got %2." [ident, show parameters_length, show types_length]
+    unless (types_length == parameters_length) $ Left $ format "function '%0': expected %1 arguments, got %2\at%3" [ident, show parameters_length, show types_length, show $ path env]
     zipWithM_ (assertTypesEqual env) types $ parameters function
 
 initialEnv :: Env
-initialEnv = Env functions variables (Path []) where
+initialEnv = Env functions variables (Path []) False where
     functions = Map.fromList [("readI32", readI32), ("writeI32", writeI32)]
     readI32 = Function { parameters = [], resultType = AST.I32 }
     writeI32 = Function { parameters = [AST.I32], resultType = AST.unit }
@@ -113,15 +126,15 @@ typeCheck ast =
         env <- insertFunctions functionDeclarations initialEnv
         sequence_ $ map (flip typeCheckFunction env) functionDeclarations
         main <- findFunction "main" env
-        unless (parameters main == []) $ Left "\"main\" function must take no arguments"
-        unless (resultType main == AST.unit) $ Left "\"main\" function must return '()' type"
+        unless (parameters main == []) $ Left "'main' function must take no arguments"
+        unless (resultType main == AST.unit) $ Left "'main' function must return '()' type"
         return $ TypeCheckedProgram ast
 
 insertFunctions :: [AST.FunctionDeclaration] -> Env -> Either String Env
 insertFunctions functions env =
     let duplicateName = findDuplicate $ map AST.name functions in
     do
-        maybe (return ()) ( \name -> Left $ format "duplicated definitions of function \"%0\" at\n%1" [name, show $ path env] ) duplicateName
+        maybe (return ()) ( \name -> Left $ format "duplicated definitions of function '%0' at\n%1" [name, show $ path env] ) duplicateName
         return $ foldl' (flip insertASTFunction) env functions
         where
           insertASTFunction :: AST.FunctionDeclaration -> Env -> Env
@@ -176,7 +189,7 @@ typeCheckStmt stmt env = case stmt of
         return env
     AST.IterableForLoop ident expr block        -> do
         exprType <- liftM varType $ typeCheckExpr expr env
-        assertIsArray exprType
+        assertIsArray env exprType
         let AST.Array valueType _ = exprType
         let env' = insertVariable ident (Variable { varType = valueType, mutable = False }) env
         blockType <- typeCheckBlock block env'
@@ -248,7 +261,7 @@ typeCheckExpr expr env = case expr of
         exprVar2 <- typeCheckExpr expr2 env
         let exprType1 = varType exprVar1
         let exprType2 = varType exprVar2
-        assertMutable exprVar1
+        assertMutable env exprVar1
         assertTypesEqual env exprType2 exprType1
         return $ Variable AST.unit False
     AST.ArrayLookup expr1 expr2 -> do
@@ -256,7 +269,7 @@ typeCheckExpr expr env = case expr of
         exprVar2 <- typeCheckExpr expr2 env
         let exprType1 = varType exprVar1
         let exprType2 = varType exprVar2
-        assertIsArray exprType1
+        assertIsArray env exprType1
         assertTypesEqual env exprType2 AST.I32
         let AST.Array valueType _ = exprType1
         return $ exprVar1 { varType = valueType }
@@ -276,7 +289,7 @@ typeCheckExpr expr env = case expr of
     AST.TupleLookup     expr n        -> do
       exprVar <- typeCheckExpr expr env
       let exprType = varType exprVar
-      assertIsTuple exprType
+      assertIsTuple env exprType
       let AST.Tuple types = exprType
       unless (length types > fromIntegral n) $ Left $ format "attempted out-of-bounds tuple index `%0` on type `%1`" [show n, show exprType]
       return $ exprVar { varType = types !! fromIntegral n }

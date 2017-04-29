@@ -14,6 +14,7 @@ import qualified AST
 import FormatString
 import TypeCheck
 import Compile
+import qualified Intermediate
 
 
 data Options = Options
@@ -83,10 +84,7 @@ main = liftM (maybe () id) . runMaybeT $ do
     Right ast -> return ast
     Left err -> (liftIO $ putStrLn err) >> mzero
   when (optVerbose options) $ liftIO $ putStrLn "Compiling into lambda."
-  let program = compile ast
-  program <- case program of
-    Right program -> return program
-    Left err -> (liftIO $ putStrLn err) >> mzero
+  let program = compile $ Intermediate.Program [Intermediate.Function "main" $ Intermediate.FunctionCall AST.unit "writeI32" [Intermediate.Literal $ AST.LiteralI32 42]]
   input <- liftIO $ getContents >>= (return.(map read).lines)
   when (optVerbose options) $ liftIO $ putStrLn "Executing."
   let output = execute program input

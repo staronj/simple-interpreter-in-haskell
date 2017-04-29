@@ -35,6 +35,9 @@ data Expr :: ExprKind -> * where
   FlowControl ::    FlowControlType -> Expr 'RValue
   BindVariables ::  [(AST.Ident, [Int32])] -> Expr 'RValue -> Expr 'RValue
 
+  -- Evaluates both expressions and returns value of second
+  Sequence ::       Expr a -> Expr b -> Expr b
+
 data LoopConstructor :: * where
   Forever ::    LoopConstructor
   While ::      Expr a -> LoopConstructor
@@ -70,6 +73,7 @@ instance TypeOf (Expr e) where
     Loop          _ _       -> AST.unit
     FlowControl   _         -> AST.unit
     BindVariables _ _       -> AST.unit
+    Sequence      _ e       -> typeOf e
 
 instance TypeOf ArrayConstructor where
   typeOf array = case array of
@@ -83,4 +87,5 @@ instance TypeOf AST.Literal where
     AST.LiteralBool _ -> AST.Bool
 
 data Function = Function { name :: AST.Ident, body :: Expr 'RValue }
+
 newtype Program = Program {  functions :: [Function] }

@@ -1,5 +1,5 @@
 -- Jakub Staroń, 2017
-{-# LANGUAGE RankNTypes, TypeSynonymInstances #-}
+{-# LANGUAGE RankNTypes, TypeSynonymInstances, GADTs #-}
 
 module Compile (compile, execute) where
 
@@ -11,33 +11,45 @@ import qualified Data.Map.Lazy as Map
 import qualified Data.Map.Strict as MapStrict
 
 import qualified AST
+import qualified Intermediate as Imd
 import RList
 import FormatString
-import TypeCheck(TypeCheckedProgram)
 
 type Input = [Int32]
 type Output = RList Int32
 
-type Interruption err val = Either (err, val) val
+newtype MemoryAddress = MemoryAddress Int32 deriving (Eq, Ord)
+newtype MemoryOffset = MemoryOffset Int32
+newtype Memory = Memory (MapStrict.Map MemoryAddress Int32)
+
+liftMemoryOffset :: (Int32 -> Int32) -> (MemoryOffset -> MemoryOffset)
+liftMemoryOffset f (MemoryOffset a) = MemoryOffset $ f a
+lift2MemoryOffset :: (Int32 -> Int32 -> Int32) -> (MemoryOffset -> MemoryOffset -> MemoryOffset)
+lift2MemoryOffset f (MemoryOffset a) (MemoryOffset b) = MemoryOffset $ f a b
+
+instance Num MemoryOffset where
+  negate      = liftMemoryOffset negate
+  (+)         = lift2MemoryOffset (+)
+  (*)         = lift2MemoryOffset (*)
+  fromInteger = MemoryOffset . fromInteger
+  abs         = liftMemoryOffset abs
+  signum      = liftMemoryOffset signum
 
 
-mapInterrupt :: (a -> b) -> Interruption c a -> Interruption c b
-mapInterrupt f (Left (err, v)) = Left (err, f v)
-mapInterrupt f (Right v) = Right (f v)
+(|+) :: MemoryAddress -> MemoryOffset -> MemoryAddress
+(|+) (MemoryAddress address) (MemoryOffset offset) = MemoryAddress (address + offset)
 
-type MemoryAddress = Int32
-type Memory = MapStrict.Map MemoryAddress Int32
 
-data State = State {input :: Input, output :: Output, memory :: Memory}
+data State = State { input :: Input, output :: Output, memory :: Memory, callPointer :: MemoryAddress }
 
-type Continuation = MemoryAddress -> State -> Interruption String State
+type Interruption value = Either (String, State) value
+type Continuation = State -> Interruption (State, MemoryAddress)
 
-data Variable = Variable { address :: MemoryAddress, valueType :: AST.Type, mutable :: Bool }
-type VEnv = Map.Map AST.Ident Variable
+newtype Variable = Variable { offset :: MemoryOffset }
+newtype Function = Function { body :: Continuation }
 
-data Function = Function { body :: Either String Continuation, parameters :: [AST.Type], resultType :: AST.Type}
 type FEnv = Map.Map AST.Ident Function
-
+type VEnv = Map.Map AST.Ident Variable
 data Env = Env {functions :: FEnv, variables :: VEnv}
 
 type Program = Continuation
@@ -45,117 +57,133 @@ type Program = Continuation
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither = flip maybe Right . Left
 
-memoryRead :: MemoryAddress -> Memory -> Int32
-memoryRead address memory =
-    case MapStrict.lookup address memory of
-        Nothing -> error "Internal interpreter error: value not found under given adress."
-        Just v -> v
+memoryRead :: MemoryAddress -> State -> Interruption Int32
+memoryRead address state = return $
+  let Memory m = memory state in
+    case MapStrict.lookup address m of
+      Nothing -> error "Internal interpreter error: value not found under given adress."
+      Just v -> v
 
-memoryWrite :: MemoryAddress -> Int32 -> Memory -> Memory
-memoryWrite address value memory = MapStrict.insert address value memory
-
+memoryWrite :: MemoryAddress -> Int32 -> State -> Interruption State
+memoryWrite address value state = return $
+  state { memory = m' } where
+    Memory m = memory state
+    m' = Memory $ MapStrict.insert address value m
+{-
 liftMemory :: (Memory -> Memory) -> (State -> Interruption a State)
 liftMemory f state = let m = (memory state) in Right $ state { memory = f m }
-
-sizeOf ::  AST.Type -> Int32
-sizeOf valueType = case valueType of
-    AST.Tuple types             -> sum $ map sizeOf types
-    AST.Array valueType count   -> (sizeOf valueType) * count
+-}
+sizeOf ::  AST.Type -> MemoryOffset
+sizeOf valueType = MemoryOffset $ sizeOf_ valueType where
+  sizeOf_ ::  AST.Type -> Int32
+  sizeOf_ valueType = case valueType of
+    AST.Tuple types             -> sum $ map sizeOf_ types
+    AST.Array valueType count   -> (sizeOf_ valueType) * count
     _                           -> 1
 
-memoryCopy :: AST.Type -> MemoryAddress -> MemoryAddress -> Memory -> Memory
-memoryCopy valueType from to memory = case valueType of
-    AST.Tuple types             -> memory' where
-        offsets = init $ scanl (+) 0 $ map sizeOf types
-        actions = map (\(offset, valueType') -> memoryCopy valueType' (from + offset) (to + offset)) $ zip offsets types
-        memory' = (foldl (.) id actions) memory
+memoryCopy :: MemoryOffset -> MemoryAddress -> MemoryAddress -> State -> Interruption State
+memoryCopy size from to state = undefined
 
-    AST.Array valueType' count  -> memory' where
-        elementSize = sizeOf valueType'
-        actions = map (\i -> memoryCopy valueType' (from + i * elementSize) (to + i * elementSize)) [0 .. count-1]
-        memory' = (foldl (.) id actions) memory
-
-    _                           -> memory' where
-        value = memoryRead from memory
-        memory' = memoryWrite to value memory
-
-findFunction :: AST.Ident -> FEnv -> Either String Function
-findFunction ident fenv = maybeToEither (format "Function \"%0\" not defined." [ident]) $ Map.lookup ident fenv
-
-assertFunctionArguments :: Function -> AST.Ident -> [AST.Type] -> Either String ()
-assertFunctionArguments function ident types = do
-    let types_length = length types
-    let parameters_length = length $ parameters function
-    unless (types_length == parameters_length) $ Left $ format "Function \"%0\": expected %1 arguments, got %2." [ident, show parameters_length, show types_length]
-    let equal t1 t2 = unless (t1 == t2) $ Left $ format "Could not match \"%0\" with \"%1\"." [show t1, show t2]
-    zipWithM_ equal types $ parameters function
-
+findFunction :: AST.Ident -> Env -> Function
+findFunction ident env = case Map.lookup ident $ functions env of
+  Nothing -> error $ format "Internal interpreter error: function \"%0\" not found." [ident]
+  Just f -> f
 
 initialFEnv :: FEnv
-initialFEnv = Map.fromList [("readI32", readI32_f), ("writeI32", writeI32_f)] where
-    readI32_f = Function { body = Right readI32, parameters = [], resultType = AST.I32 } where
-        readI32 :: Continuation
-        readI32 address state =
-            Right $ state { input = input', memory = memory' } where
-                value : input' = input state
-                memory' = memoryWrite address value (memory state)
-    writeI32_f = Function { body = Right writeI32, parameters = [AST.I32], resultType = AST.unit } where
-        writeI32 :: Continuation
-        writeI32 address state =
-            Right $ state { output = (out :> value) } where
-                out = output state
-                value = memoryRead address (memory state)
+initialFEnv = Map.fromList [
+    ("readI32", Function readI32)
+  , ("writeI32", Function writeI32)
+  , ("$or", Function or_)
+  , ("$and", Function and_)
+  , ("$less", Function less_)
+  , ("$add", Function add_)
+  , ("$subtract", Function subtract_)
+  , ("$multiply", Function multiply_)
+  , ("$divide", Function divide_)
+  , ("$modulo", Function modulo_)
+  , ("$negate", Function negate_)
+  , ("$not", Function not_)
+  ] where
+  readI32 :: Continuation
+  readI32 state = do
+    let callAddress = callPointer state
+    let value : input' = input state
+    state <- return $ state { input = input' }
+    state <- memoryWrite callAddress value state
+    return (state, callAddress)
+  writeI32 :: Continuation
+  writeI32 state = do
+    let callAddress = callPointer state
+    value <- memoryRead callAddress state
+    state <- return $ state { output = (output state :> value) }
+    return (state, callAddress)
+  or_ state = do
+    let callAddress = callPointer state
+    let argumentsAddress = callAddress |+ sizeOf AST.Bool
+    v1 <- memoryRead argumentsAddress state
+    v2 <- memoryRead (argumentsAddress |+ sizeOf AST.Bool) state
+    state <- memoryWrite callAddress (v1 * v2) state
+    return (state, callAddress)
+  and_ state = undefined
+  less_ state = undefined
+  add_ state = undefined
+  subtract_ state = undefined
+  multiply_ state = undefined
+  divide_ state = undefined
+  modulo_ state = undefined
+  negate_ state = undefined
+  not_ state = undefined
 
 initialVEnv :: VEnv
 initialVEnv = Map.empty
 
-identityContinuation :: Continuation
-identityContinuation memoryAddress state = Right state
+compile program = body $ findFunction "main" env where
+  env = Env fenv initialVEnv
+  fenv = foldl' insertFunction initialFEnv $ Imd.functions program where
+    insertFunction :: FEnv -> Imd.Function -> FEnv
+    insertFunction fenv' function = Map.insert (Imd.name function) (Function $ compileExpr env (MemoryOffset 0) (Imd.body function)) fenv'
 
-typeOf :: AST.Expr -> Either String AST.Type
-typeOf expr = case expr of
-    AST.BinaryOperator  expr1 expr2 kind    -> undefined
-    AST.UnaryOperator   expr kind           -> undefined
-    AST.Identifier      ident               -> undefined
-    AST.LiteralExpr     literal             -> undefined
-    AST.FunctionCall    ident exprs         -> undefined
-    AST.TupleLookup     expr index          -> undefined
-    AST.ArrayElements   exprs               -> undefined
-    AST.ArrayRepeat     expr count          -> do
-        valueType <- typeOf expr
-        return $ AST.Array valueType count
-    AST.ArrayRange      begin end           -> do
-        unless (begin < end) $ Left $ format "Expected nonempty range, got [%0..%1]" [show begin, show end]
-        return $ AST.Array AST.I32 (end - begin)
-    AST.TupleConstruct  exprs               -> do
-        types <- mapM typeOf exprs
-        return $ AST.Tuple types
-    AST.BlockExpr       (AST.Block _ expr)  -> typeOf expr
-    AST.IfElse          expr (AST.Block _ expr1) (AST.Block _ expr2)  -> do
-        type1 <- typeOf expr1
-        type2 <- typeOf expr2
-        unless (type1 == type2) $ Left $ format "\"if-else\": could not match \"%0\" with \"%1\"" [show type1, show type2]
-        return type1
+compileExpr :: Env -> MemoryOffset -> Imd.Expr a -> Continuation
+compileExpr env offset expr state = case expr of
+  Imd.FunctionCall resultType ident exprs -> do
+    let callAddress = callPointer state
+    let heapPointer = callAddress |+ offset
+    let fn = body $ findFunction ident env
+    let offsets = scanl (+) (sizeOf resultType) $ map (sizeOf . Imd.typeOf) exprs
+    exprs <- return $ map (uncurry $ compileExpr env) (zip offsets exprs)
+    (state, _) <- foldM (\(state, _) expr -> expr state) (state, undefined) exprs
+    (state, _) <- fn state
+    return (state, heapPointer)
 
+  Imd.TupleLookup   t _ _     -> undefined
+  Imd.ArrayLookup   t _ _     -> undefined
+  Imd.Assign        _ _       -> undefined
+  Imd.Equal         _ _       -> undefined
+  Imd.Dereference   t _       -> undefined
+  Imd.Borrow        t _       -> undefined
+  Imd.Identifier    t _       -> undefined
+  Imd.Literal literal -> do
+    let callAddress = callPointer state
+    let heapPointer = callAddress |+ offset
+    let value = case literal of {
+      AST.LiteralI32 n -> n;
+      AST.LiteralBool True -> 1;
+      AST.LiteralBool False -> 0;
+    }
+    state <- memoryWrite heapPointer value state
+    return (state, heapPointer)
 
-compile :: TypeCheckedProgram -> Either String Program
-compile (TypeCheckedProgram ast) =
-    let functionDeclarations = AST.functions ast in
-    let fenv = insertFunctions functionDeclarations initialFEnv in
-    do
-        sequence_ $ fmap body fenv
-        main <- findFunction "main" fenv
-        unless (parameters main == []) $ Left "\"main\" function must take no arguments."
-        unless (resultType main == AST.unit) $ Left "\"main\" function must return '()' type."
-        body main
+  Imd.Array         c         -> undefined
+  Imd.Tuple         t _       -> undefined
+  Imd.IfElse        t _ _ _   -> undefined
+  Imd.Materialize   t         -> undefined
+  Imd.If            _ _       -> undefined
+  Imd.Loop          _ _       -> undefined
+  Imd.FlowControl   _         -> undefined
+  Imd.BindVariables _ _       -> undefined
+  Imd.Sequence      _ e       -> undefined
 
-insertFunctions :: [AST.FunctionDeclaration] -> FEnv -> FEnv
-insertFunctions functionDeclarations fenv =
-    let fenv' = foldl' addFun fenv functionDeclarations where
-        addFun :: FEnv -> AST.FunctionDeclaration -> FEnv
-        addFun fenv function = Map.insert (AST.name function) (compileFunction function fenv') fenv in
-    fenv'
-
+{-
 compileFunction :: AST.FunctionDeclaration -> FEnv -> Function
 compileFunction function fenv =
     let venv = initialVEnv in
@@ -215,9 +243,12 @@ compileExpr expr env = case expr of
         return (resultType function, cont)
     AST.TupleConstruct exprs        -> return (AST.unit, identityContinuation)
     _                               -> error "Not implemented."
+-}
 
-execute :: Program -> Input -> Interruption String Output
+execute :: Program -> Input -> Either (String, Output) Output
 execute program input =
-    let memory = Map.empty in
-    let state = State input Nil memory in
-    mapInterrupt (\( State _ output memory) -> memory `seq` output) (program 0 state)
+  let emptyMemory = Memory Map.empty in
+  let state = State input Nil emptyMemory (MemoryAddress 0) in
+  case program  state of
+    Right (state, _) -> (memory state) `seq` Right $ output state
+    Left (message, state) -> (memory state) `seq` Left $ (message, output state)
