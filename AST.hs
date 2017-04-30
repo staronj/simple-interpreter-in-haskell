@@ -273,6 +273,14 @@ buildType type' = case type' of
       Abs.MarkTHead t     -> [t]
       Abs.MarkTTail ts t  -> (buildList ts) ++ [t]
 
+isFunDeclStmt :: AST.Stmt -> Bool
+isFunDeclStmt (AST.FunDeclStmt _ ) = True
+isFunDeclStmt _ = False
+
+getFunctionsFromBlock :: Block -> [FunctionDeclaration]
+getFunctionsFromBlock block = [funDecl | AST.FunDeclStmt funDecl <- stmts] where
+  Block stmts _ = block
+
 -- Print AST to Tree
 prettyPrint :: Program -> String
 prettyPrint = drawTree . programToTree

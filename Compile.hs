@@ -5,6 +5,7 @@ module Compile (compile, execute) where
 
 import Data.Int
 import Data.List
+import Data.Maybe (fromMaybe)
 import Control.Monad
 import Control.Monad.Cont
 import qualified Data.Map.Lazy as Map
@@ -60,9 +61,9 @@ maybeToEither = flip maybe Right . Left
 memoryRead :: MemoryAddress -> State -> Interruption Int32
 memoryRead address state = return $
   let Memory m = memory state in
-    case MapStrict.lookup address m of
-      Nothing -> error "Internal interpreter error: value not found under given adress."
-      Just v -> v
+    fromMaybe
+    (error "Internal interpreter error: value not found under given adress.")
+    (MapStrict.lookup address m)
 
 memoryWrite :: MemoryAddress -> Int32 -> State -> Interruption State
 memoryWrite address value state = return $
@@ -78,16 +79,17 @@ sizeOf valueType = MemoryOffset $ sizeOf_ valueType where
   sizeOf_ ::  AST.Type -> Int32
   sizeOf_ valueType = case valueType of
     AST.Tuple types             -> sum $ map sizeOf_ types
-    AST.Array valueType count   -> (sizeOf_ valueType) * count
+    AST.Array valueType count   -> sizeOf_ valueType * count
     _                           -> 1
 
 memoryCopy :: MemoryOffset -> MemoryAddress -> MemoryAddress -> State -> Interruption State
 memoryCopy size from to state = undefined
 
 findFunction :: AST.Ident -> Env -> Function
-findFunction ident env = case Map.lookup ident $ functions env of
-  Nothing -> error $ format "Internal interpreter error: function \"%0\" not found." [ident]
-  Just f -> f
+findFunction ident env =
+  fromMaybe
+  (error $ format "Internal interpreter error: function \"%0\" not found." [ident])
+  (Map.lookup ident $ functions env)
 
 initialFEnv :: FEnv
 initialFEnv = Map.fromList [
@@ -115,7 +117,7 @@ initialFEnv = Map.fromList [
   writeI32 state = do
     let callAddress = callPointer state
     value <- memoryRead callAddress state
-    state <- return $ state { output = (output state :> value) }
+    state <- return $ state { output = output state :> value }
     return (state, callAddress)
   or_ state = do
     let callAddress = callPointer state
@@ -137,51 +139,50 @@ initialFEnv = Map.fromList [
 initialVEnv :: VEnv
 initialVEnv = Map.empty
 
-compile program = body $ findFunction "main" env where
+compile program = body $ findFunction (Imd.mainUid program) env where
   env = Env fenv initialVEnv
   fenv = foldl' insertFunction initialFEnv $ Imd.functions program where
     insertFunction :: FEnv -> Imd.Function -> FEnv
     insertFunction fenv' function = Map.insert (Imd.name function) (Function $ compileExpr env (MemoryOffset 0) (Imd.body function)) fenv'
 
 compileExpr :: Env -> MemoryOffset -> Imd.Expr a -> Continuation
-compileExpr env offset expr state = case expr of
-  Imd.FunctionCall resultType ident exprs -> do
-    let callAddress = callPointer state
-    let heapPointer = callAddress |+ offset
-    let fn = body $ findFunction ident env
-    let offsets = scanl (+) (sizeOf resultType) $ map (sizeOf . Imd.typeOf) exprs
-    exprs <- return $ map (uncurry $ compileExpr env) (zip offsets exprs)
-    (state, _) <- foldM (\(state, _) expr -> expr state) (state, undefined) exprs
-    (state, _) <- fn state
-    return (state, heapPointer)
+compileExpr env offset expr state =
+  let callAddress = callPointer state in
+  let heapPointer = callAddress |+ offset in
+  case expr of
+    Imd.FunctionCall resultType ident exprs -> do
+      let fn = body $ findFunction ident env
+      let offsets = scanl (+) (sizeOf resultType) $ map (sizeOf . Imd.typeOf) exprs
+      exprs <- return $ zipWith (compileExpr env) offsets exprs
+      (state, _) <- foldM (\(state, _) expr -> expr state) (state, undefined) exprs
+      (state, _) <- fn state
+      return (state, heapPointer)
 
-  Imd.TupleLookup   t _ _     -> undefined
-  Imd.ArrayLookup   t _ _     -> undefined
-  Imd.Assign        _ _       -> undefined
-  Imd.Equal         _ _       -> undefined
-  Imd.Dereference   t _       -> undefined
-  Imd.Borrow        t _       -> undefined
-  Imd.Identifier    t _       -> undefined
-  Imd.Literal literal -> do
-    let callAddress = callPointer state
-    let heapPointer = callAddress |+ offset
-    let value = case literal of {
-      AST.LiteralI32 n -> n;
-      AST.LiteralBool True -> 1;
-      AST.LiteralBool False -> 0;
-    }
-    state <- memoryWrite heapPointer value state
-    return (state, heapPointer)
+    Imd.TupleLookup   _ _       -> undefined
+    Imd.ArrayLookup   _ _       -> undefined
+    Imd.Assign        _ _       -> undefined
+    Imd.Equal         _ _       -> undefined
+    Imd.Dereference   t _       -> undefined
+    Imd.Borrow        t _       -> undefined
+    Imd.Identifier    t _       -> undefined
+    Imd.Literal literal -> do
+      let value = case literal of {
+        AST.LiteralI32 n -> n;
+        AST.LiteralBool True -> 1;
+        AST.LiteralBool False -> 0;
+      }
+      state <- memoryWrite heapPointer value state
+      return (state, heapPointer)
 
-  Imd.Array         c         -> undefined
-  Imd.Tuple         t _       -> undefined
-  Imd.IfElse        t _ _ _   -> undefined
-  Imd.Materialize   t         -> undefined
-  Imd.If            _ _       -> undefined
-  Imd.Loop          _ _       -> undefined
-  Imd.FlowControl   _         -> undefined
-  Imd.BindVariables _ _       -> undefined
-  Imd.Sequence      _ e       -> undefined
+    Imd.Array         c         -> undefined
+    Imd.Tuple         _         -> undefined
+    Imd.IfElse        _ _ _     -> undefined
+    Imd.Materialize   t         -> undefined
+    Imd.If            _ _       -> undefined
+    Imd.Loop          _ _       -> undefined
+    Imd.FlowControl   _         -> undefined
+    Imd.BindVariables bindings initializer suffix -> undefined
+    Imd.Sequence      _ e       -> undefined
 
 {-
 compileFunction :: AST.FunctionDeclaration -> FEnv -> Function
@@ -250,5 +251,5 @@ execute program input =
   let emptyMemory = Memory Map.empty in
   let state = State input Nil emptyMemory (MemoryAddress 0) in
   case program  state of
-    Right (state, _) -> (memory state) `seq` Right $ output state
-    Left (message, state) -> (memory state) `seq` Left $ (message, output state)
+    Right (state, _) -> memory state `seq` Right $ output state
+    Left (message, state) -> memory state `seq` Left (message, output state)

@@ -1,17 +1,16 @@
-{-# LANGUAGE GADTs, KindSignatures, DataKinds, ExistentialQuantification, TypeOperators #-}
+{-# LANGUAGE GADTs, KindSignatures, DataKinds #-}
 
 module Intermediate where
 
 import Data.Int
-import qualified AST
+import qualified AST(Ident, Type(..), unit, Literal(..))
 
 data ExprKind = RValue | LValue
 
--- Every expr have type now?
 data Expr :: ExprKind -> * where
   FunctionCall ::   AST.Type -> AST.Ident -> [Expr 'RValue] -> Expr 'RValue
-  TupleLookup ::    AST.Type -> Expr a -> Int32 -> Expr a
-  ArrayLookup ::    AST.Type -> Expr a -> Expr b -> Expr a
+  TupleLookup ::    Expr a -> Int32 -> Expr a
+  ArrayLookup ::    Expr a -> Expr b -> Expr a
 
   Equal ::          Expr a -> Expr b -> Expr 'RValue
   Assign ::         Expr 'LValue -> Expr a -> Expr 'RValue
@@ -21,8 +20,8 @@ data Expr :: ExprKind -> * where
   Identifier ::     AST.Type -> AST.Ident -> Expr 'LValue
   Literal ::        AST.Literal -> Expr 'RValue
   Array ::          ArrayConstructor -> Expr 'RValue
-  Tuple ::          AST.Type -> [Expr 'RValue] -> Expr 'RValue
-  IfElse ::         AST.Type -> Expr a -> Expr 'RValue -> Expr 'RValue -> Expr 'RValue
+  Tuple ::          [Expr 'RValue] -> Expr 'RValue
+  IfElse ::         Expr a -> Expr 'RValue -> Expr 'RValue -> Expr 'RValue
 
   -- Takes LValue and pushes it on the stack
   Materialize ::    Expr 'LValue -> Expr 'RValue
@@ -33,7 +32,7 @@ data Expr :: ExprKind -> * where
 
   -- Flow control instructions: break and continue
   FlowControl ::    FlowControlType -> Expr 'RValue
-  BindVariables ::  [(AST.Ident, [Int32])] -> Expr 'RValue -> Expr 'RValue
+  BindVariables ::  [(AST.Ident, [Int32])] -> Expr 'RValue -> Expr 'RValue -> Expr 'RValue
 
   -- Evaluates both expressions and returns value of second
   Sequence ::       Expr a -> Expr b -> Expr b
@@ -57,8 +56,8 @@ class TypeOf a where
 instance TypeOf (Expr e) where
   typeOf expr = case expr of
     FunctionCall  t _ _     -> t
-    TupleLookup   t _ _     -> t
-    ArrayLookup   t _ _     -> t
+    TupleLookup   e n       -> let AST.Tuple ts = typeOf e in ts !! fromIntegral n
+    ArrayLookup   e _       -> let AST.Array t _ = typeOf e in t
     Assign        _ _       -> AST.unit
     Equal         _ _       -> AST.Bool
     Dereference   t _       -> t
@@ -66,13 +65,13 @@ instance TypeOf (Expr e) where
     Identifier    t _       -> t
     Literal       l         -> typeOf l
     Array         c         -> typeOf c
-    Tuple         t _       -> t
-    IfElse        t _ _ _   -> t
+    Tuple         es        -> AST.Tuple $ map typeOf es
+    IfElse        _ e _     -> typeOf e
     Materialize   t         -> typeOf t
     If            _ _       -> AST.unit
     Loop          _ _       -> AST.unit
     FlowControl   _         -> AST.unit
-    BindVariables _ _       -> AST.unit
+    BindVariables _ _ _     -> AST.unit
     Sequence      _ e       -> typeOf e
 
 instance TypeOf ArrayConstructor where
@@ -88,4 +87,4 @@ instance TypeOf AST.Literal where
 
 data Function = Function { name :: AST.Ident, body :: Expr 'RValue }
 
-newtype Program = Program {  functions :: [Function] }
+data Program = Program { functions :: [Function], mainUid :: AST.Ident }

@@ -40,21 +40,58 @@ newtype TypeCheckedProgram = TypeCheckedProgram AST.Program
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither = flip maybe Right . Left
 
+-- Messages
+functionNotFoundMessage :: Env -> AST.Ident -> String
+functionNotFoundMessage env name = format "cannot find function `%0` in scope\n%1" [name, show $ path env]
 
--- Error Messages
--- functionNotFoundMessage :: Env -> AST.Ident -> String
--- functionNotFound env name = format "cannot find function `%0` in scope\n%1" [name, show $ path env]
+variableNotFoundMessage :: Env -> AST.Ident -> String
+variableNotFoundMessage env name = format "cannot find value `%0` in scope\n%1" [name, show $ path env]
 
--- Error Messages End
+tupleLengthNotMatchMessage :: (Num a, Show a) => Env -> a -> a -> String
+tupleLengthNotMatchMessage env first second = format "could not match tuple of %0 elements with tuple of %1 elements in scope\n%2" [show first, show second, show $ path env]
 
+couldNotMatchTypeWithTupleMessage :: Env -> AST.Type -> String
+couldNotMatchTypeWithTupleMessage env valueType = format "could not match '%0' with tuple in scope\n%1" [show valueType, show $ path env]
+
+couldNotMatchTypesMessage :: Env -> AST.Type -> AST.Type -> String
+couldNotMatchTypesMessage env type1 type2 = format "could not match type '%0' with type '%1'\nat %2" [show type1, show type2, show $ path env]
+
+expectedMutableVariableMessage :: Env -> String
+expectedMutableVariableMessage env = format "expected mutable variable\nat%0" [show $ path env]
+
+expectedArrayMessage :: Env -> AST.Type -> String
+expectedArrayMessage env valueType = format "expected array, not a value of type '%0'\nat%1" [show valueType, show $ path env]
+
+expectedTupleMessage :: Env -> AST.Type -> String
+expectedTupleMessage env valueType = format "expected tuple, not a value of type '%0'\nat%1" [show valueType, show $ path env]
+
+invalidNumberOfArgumentsMessage :: (Num a, Show a) => Env -> AST.Ident -> a -> a -> String
+invalidNumberOfArgumentsMessage env name expected got = format "function '%0': expected %1 arguments, got %2\at%3" [name, show expected, show got, show $ path env]
+
+mainFunctionMustTakeNoArgumentsMessage :: String
+mainFunctionMustTakeNoArgumentsMessage = "'main' function must take no arguments"
+
+mainFunctionMustReturnUnitMessage :: String
+mainFunctionMustReturnUnitMessage = "'main' function must return '()' type"
+
+duplicatedFunctionIdentifierInScopeMessage :: Env -> AST.Ident -> String
+duplicatedFunctionIdentifierInScopeMessage env name =  format "duplicated definitions of function '%0' at\n%1" [name, show $ path env]
+
+outOfBoundsTupleLookupMessage :: (Num a, Show a) => Env -> AST.Type -> a -> String
+outOfBoundsTupleLookupMessage env valueType n = format "attempted out-of-bounds tuple index `%0` on type `%1` at\n%2" [show n, show valueType, show $ path env]
+
+arrayFromInvalidRangeMessage :: (Num a, Show a) => Env -> a -> a -> String
+arrayFromInvalidRangeMessage env begin end = format "trying to create array from invalid range `(%0, %1)`" [show begin, show end, show $ path env]
+
+-- Messages End
 
 findFunction :: AST.Ident -> Env -> Either String Function
 findFunction name env = maybeToEither message $ Map.lookup name $ functions env where
-  message = format "cannot find function `%0` in this scope" [name]
+  message = functionNotFoundMessage env name
 
 findVariable :: AST.Ident -> Env -> Either String Variable
 findVariable name env = maybeToEither message $ Map.lookup name $ variables env where
-  message = format "cannot find value `%0` in this scope" [name]
+  message = variableNotFoundMessage env name
 
 insertFunction :: AST.Ident -> Function -> Env -> Env
 insertFunction name function env = env' where
@@ -75,10 +112,10 @@ insertPattern pattern valueType env = case pattern of
     AST.Tuple types -> do
       let pattern_length = length pattern'
       let types_length = length types
-      unless (pattern_length == types_length) $ Left $ format "could not match tuple of %0 elements with tuple of %1 elements" [show types_length, show pattern_length]
+      unless (pattern_length == types_length) $ Left $ tupleLengthNotMatchMessage env types_length pattern_length
       let pairs = map (uncurry insertPattern) $ zip pattern' types
       foldl' (>=>) return pairs env
-    _               -> Left $ format "could not match '%0' with tuple" [show valueType]
+    _               -> Left $ couldNotMatchTypeWithTupleMessage env valueType
 
 pushSubpath :: String -> String -> Env -> Env
 pushSubpath nodeType name env = env { path = Path $ (nodeType, name) : oldPath} where
@@ -88,29 +125,33 @@ setSubpath :: String -> String -> Env -> Env
 setSubpath nodeType name env = env { path = Path $ (nodeType, name) : oldPath} where
   Path (_ : oldPath) = path env
 
+-- Assertions begin
+
 assertTypesEqual :: Env -> AST.Type -> AST.Type -> Either String ()
 assertTypesEqual env type1 type2 =
-  unless (type1 == type2) $ Left $ format "could not match type '%0' with type '%1'\nat %2" [show type1, show type2, show $ path env]
+  unless (type1 == type2) $ Left $ couldNotMatchTypesMessage env type1 type2
 
 assertMutable :: Env -> Variable -> Either String ()
-assertMutable env variable = unless (mutable variable) $ Left $ format "expected mutable variable\nat%0" [show $ path env]
+assertMutable env variable = unless (mutable variable) $ Left $ expectedMutableVariableMessage env
 
 assertIsArray :: Env -> AST.Type -> Either String ()
 assertIsArray env valueType = case valueType of
     AST.Array {}  -> return ()
-    _             -> Left $ format "expected array, not a value of type '%0'\nat%1" [show valueType, show $ path env]
+    _             -> Left $ expectedArrayMessage env valueType
 
 assertIsTuple :: Env -> AST.Type -> Either String ()
 assertIsTuple env valueType = case valueType of
     AST.Tuple {}  -> return ()
-    _             -> Left $ format "expected tuple, not a value of type '%0'\nat%1" [show valueType, show $ path env]
+    _             -> Left $ expectedTupleMessage env valueType
 
 assertFunctionArguments :: Env -> Function -> AST.Ident -> [AST.Type] -> Either String ()
 assertFunctionArguments env function ident types = do
     let types_length = length types
     let parameters_length = length $ parameters function
-    unless (types_length == parameters_length) $ Left $ format "function '%0': expected %1 arguments, got %2\at%3" [ident, show parameters_length, show types_length, show $ path env]
+    unless (types_length == parameters_length) $ Left $ invalidNumberOfArgumentsMessage env ident parameters_length types_length
     zipWithM_ (assertTypesEqual env) types $ parameters function
+
+-- Assertions end
 
 initialEnv :: Env
 initialEnv = Env functions variables (Path []) False where
@@ -119,22 +160,22 @@ initialEnv = Env functions variables (Path []) False where
     writeI32 = Function { parameters = [AST.I32], resultType = AST.unit }
     variables = Map.empty
 
-typeCheck :: AST.Program -> Either String TypeCheckedProgram
+typeCheck :: AST.Program -> Either String AST.Program
 typeCheck ast =
     let functionDeclarations = AST.functions ast in
     do
         env <- insertFunctions functionDeclarations initialEnv
         sequence_ $ map (flip typeCheckFunction env) functionDeclarations
         main <- findFunction "main" env
-        unless (parameters main == []) $ Left "'main' function must take no arguments"
-        unless (resultType main == AST.unit) $ Left "'main' function must return '()' type"
-        return $ TypeCheckedProgram ast
+        unless (parameters main == []) $ Left mainFunctionMustTakeNoArgumentsMessage
+        unless (resultType main == AST.unit) $ Left mainFunctionMustReturnUnitMessage
+        return ast
 
 insertFunctions :: [AST.FunctionDeclaration] -> Env -> Either String Env
 insertFunctions functions env =
     let duplicateName = findDuplicate $ map AST.name functions in
     do
-        maybe (return ()) ( \name -> Left $ format "duplicated definitions of function '%0' at\n%1" [name, show $ path env] ) duplicateName
+        maybe (return ()) (Left . (duplicatedFunctionIdentifierInScopeMessage env)) duplicateName
         return $ foldl' (flip insertASTFunction) env functions
         where
           insertASTFunction :: AST.FunctionDeclaration -> Env -> Env
@@ -154,8 +195,8 @@ typeCheckFunction fun env = do
         assertTypesEqual env blockType resultType
 
 typeCheckBlock :: AST.Block -> Env -> Either String AST.Type
-typeCheckBlock (AST.Block stmts expr) env = do
-        env <- insertFunctions [funDecl | AST.FunDeclStmt funDecl <- stmts] env
+typeCheckBlock block@(AST.Block stmts expr) env = do
+        env <- insertFunctions (AST.getFunctionsFromBlock block) env
         env <- return $ pushSubpath "block" "0" env
         env <- return $ pushSubpath "" "" env
         stmts <- return $ map typeCheckStmt stmts
@@ -291,7 +332,7 @@ typeCheckExpr expr env = case expr of
       let exprType = varType exprVar
       assertIsTuple env exprType
       let AST.Tuple types = exprType
-      unless (length types > fromIntegral n) $ Left $ format "attempted out-of-bounds tuple index `%0` on type `%1`" [show n, show exprType]
+      unless (length types > fromIntegral n) $ Left $ outOfBoundsTupleLookupMessage env exprType n
       return $ exprVar { varType = types !! fromIntegral n }
     AST.ArrayElements   exprs               -> do
         exprs <- mapM (flip typeCheckExpr env) exprs
@@ -304,7 +345,7 @@ typeCheckExpr expr env = case expr of
         exprType <- liftM varType $ typeCheckExpr expr env
         return $ Variable (AST.Array exprType integer) False
     AST.ArrayRange      begin end           -> do
-        unless (begin < end) $ Left $ format "trying to create array from invalid range `(%0, %1)`" [show begin, show end]
+        unless (begin < end) $ Left $ arrayFromInvalidRangeMessage env begin end
         return $ Variable (AST.Array AST.I32 (end - begin)) False
     AST.TupleConstruct  exprs               -> do
         variables <- mapM (flip typeCheckExpr env) exprs

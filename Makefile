@@ -6,6 +6,7 @@ MKDIR_COMMAND = mkdir
 DIRECTORIES = obj parser
 PARSER_FILES = parser/AbsGrammar.hs parser/ComposOp.hs parser/ErrM.hs parser/LexGrammar.hs parser/ParGrammar.hs parser/PrintGrammar.hs parser/SkelGrammar.hs
 
+SOURCES = *.hs Intermediate/*.hs
 
 all: directories interpreter.exe
 
@@ -15,10 +16,10 @@ test_grammar: GrammarUnitTests.exe
 test_type_checking: TypeCheckUnitTests.exe
 	./TypeCheckUnitTests.exe
 
-%.exe: %.hs $(PARSER_FILES)
+%.exe: %.hs $(PARSER_FILES) $(SOURCES)
 	$(COMPILER) $(FLAGS) --make $< -o $@
 
-interpreter.exe: Main.hs $(PARSER_FILES)
+interpreter.exe: Main.hs $(PARSER_FILES) $(SOURCES)
 	$(COMPILER) $(FLAGS) --make Main.hs -o interpreter.exe
 
 $(PARSER_FILES): grammar.bnfc
