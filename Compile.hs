@@ -151,22 +151,41 @@ initialFEnv = Map.fromList [
     return (state, callAddress)
   or_ = buildBinaryOperatorFunction (\a b -> if a == 1 || b == 1 then 1 else 0)
   and_ = buildBinaryOperatorFunction (*)
-  less_ state = undefined
+  less_ = buildBinaryOperatorFunction (\a b -> if a < b then 1 else 0)
   add_ = buildBinaryOperatorFunction (+)
   subtract_ = buildBinaryOperatorFunction (-)
   multiply_ = buildBinaryOperatorFunction (*)
-  divide_ state = undefined
-  modulo_ state = undefined
-  negate_ state = undefined
-  not_ state = undefined
+  divide_ = buildDivisionLikeOperator quot
+  modulo_ = buildDivisionLikeOperator mod
+  negate_ = buildUnaryOperatorFunction negate
+  not_ = buildUnaryOperatorFunction (1-)
   buildBinaryOperatorFunction :: (Int32 -> Int32 -> Int32) -> Continuation
   buildBinaryOperatorFunction f state = do
     let callAddress = callPointer state
     let argumentsAddress = callAddress |+ 1
     let v1 = memoryRead argumentsAddress state
     let v2 = memoryRead (argumentsAddress |+ 1) state
-    -- trace (format "Tu binary operator function, v1 = %0, v2 = %1" [show v1, show v2]) (return ())
+    trace (format "Tu binary operator function, v1 = %0, v2 = %1" [show v1, show v2]) (return ())
     state <- return $ memoryWrite callAddress (f v1 v2) state
+    return (state, callAddress)
+  buildDivisionLikeOperator :: (Int32 -> Int32 -> Int32) -> Continuation
+  buildDivisionLikeOperator f state = do
+    let callAddress = callPointer state
+    let argumentsAddress = callAddress |+ 1
+    let v1 = memoryRead argumentsAddress state
+    let v2 = memoryRead (argumentsAddress |+ 1) state
+    trace (format "Tu division like operator function, v1 = %0, v2 = %1" [show v1, show v2]) (return ())
+    when (v2 == 0) $ Left ("Runtime error: divide by 0.", state)
+    when (v1 == minBound && v2 == -1) $ Left ("Runtime error: divide minint by -1.", state)
+    state <- return $ memoryWrite callAddress (f v1 v2) state
+    return (state, callAddress)
+  buildUnaryOperatorFunction :: (Int32 -> Int32) -> Continuation
+  buildUnaryOperatorFunction f state = do
+    let callAddress = callPointer state
+    let argumentsAddress = callAddress |+ 1
+    let v = memoryRead argumentsAddress state
+    trace (format "Tu unary operator function, v = %0" [show v]) (return ())
+    state <- return $ memoryWrite callAddress (f v) state
     return (state, callAddress)
 initialVEnv :: VEnv
 initialVEnv = Map.empty
@@ -195,12 +214,10 @@ compileFunction env function = Function cont where
     env <- return $ bindVariables (Imd.bindings function) (Imd.parameter function) resultSize env
     -- Compile expression with offset = sizeOf resultType and copy
     -- result of the expression later to left space
-    -- trace (format "Hello from function '%0', variable bindings: %1" [Imd.name function, show $ variables env]) (return ())
+    trace (format "Hello from function '%0', resultSize: %2, variable bindings: %1" [Imd.name function, show $ variables env, show resultSize]) (return ())
     expr <- return $ compileExpr env (resultSize + parameterSize) (Imd.body function)
     (state, resultAddress) <- expr state
-    -- trace (format "After calling function, result address = %0, value under is %1" [show resultAddress, show $ memoryRead resultAddress state]) (return ())
     state <- return $ memoryCopy resultSize resultAddress (callPointer state) state
-    -- trace (format "After copying value, call pointer is %0, value under is %1" [show $ callPointer state, show $ memoryRead (callPointer state) state]) (return ())
     return (state, callPointer state)
 
 compileExpr :: Env -> MemoryOffset -> Imd.Expr a -> Continuation
@@ -216,16 +233,25 @@ compileExpr env offset expr state =
       let offsets = scanl (+) (offset + sizeOf resultType) $ map (sizeOf . Imd.typeOf) exprs
       exprs <- return $ zipWith (compileExpr env) offsets exprs
       (state, _) <- foldM (\(state, _) expr -> expr state) (state, undefined) exprs
-      -- trace (format "Call of function '%0', call on memory address: %1.\nMemory in the moment of call: %2" [ident, show heapPointer, show $ memory state]) (return ())
+      trace (format "Call of function '%0', call on memory address: %1.\nMemory in the moment of call: %2" [ident, show heapPointer, show $ memory state]) (return ())
       (state, _) <- fn $ state { callPointer = heapPointer }
       state <- return $ state { callPointer = callAddress }
-      --_ <- trace (format "Back from function '%0'.\nMemory after call: %1" [ident, show $ memory state]) (return ())
+      _ <- trace (format "Back from function '%0'.\nMemory after call: %1" [ident, show $ memory state]) (return ())
       -- Returns new state and pointer to newly created value (probably anyway ignored)
       return (state, heapPointer)
 
     Imd.TupleLookup   _ _       -> undefined
     Imd.ArrayLookup   _ _       -> undefined
-    Imd.Assign        _ _       -> undefined
+    Imd.Assign        expr1 expr2 -> do
+      let assignType = typeOf expr2
+      let assignSize = sizeOf assignType
+      expr1 <- return $ compileExpr env offset expr1
+      expr2 <- return $ compileExpr env offset expr2
+      (state, writeAddress) <- expr1 state
+      (state, readAddress) <- expr2 state
+      state <- return $ memoryCopy assignSize readAddress writeAddress state
+      -- Returning heap pointer because result type is ().
+      return (state, heapPointer)
     Imd.Equal         expr1 expr2 -> do
       assert (sizeOf (typeOf expr1) == sizeOf (typeOf expr2)) $ return ()
       let sizeOfValue = sizeOf $ typeOf expr1
@@ -234,7 +260,7 @@ compileExpr env offset expr state =
       (state, valueAddress1) <- expr1 state
       (state, valueAddress2) <- expr2 state
       let equal = memoryEqual sizeOfValue valueAddress1 valueAddress2 state
-      -- trace (format "Tu equal, wpisuje wynik porownania (%0) na adres %1." [show equal, show heapPointer]) (return ())
+      trace (format "Tu equal, wpisuje wynik porownania (%0) na adres %1." [show equal, show heapPointer]) (return ())
       state <- return $ memoryWrite heapPointer (if equal then 1 else 0) state
       return (state, heapPointer)
     Imd.Dereference   t _       -> undefined
@@ -274,11 +300,37 @@ compileExpr env offset expr state =
       let sizeOfValue = sizeOf typeOfExpr
       expr <- return $ compileExpr env (offset + sizeOfValue) expr
       (state, valueAddress) <- expr state
-      -- trace (format "Materializing 'LValue' of type %0, copying from address %1 to address %2." [show typeOfExpr, show valueAddress, show heapPointer]) (return ())
+      trace (format "Materializing 'LValue' of type %0, copying from address %1 to address %2." [show typeOfExpr, show valueAddress, show heapPointer]) (return ())
       state <- return $ memoryCopy sizeOfValue valueAddress heapPointer state
       return (state, heapPointer)
     Imd.If            _ _       -> undefined
-    Imd.Loop          _ _       -> undefined
+    Imd.Loop          loopConstructor block       ->
+      case loopConstructor of
+        Imd.ForRange variableName beginExpr endExpr -> do
+          let forVariableOffset = offset + 2 * sizeOf AST.I32
+          beginExpr <- return $ compileExpr env offset beginExpr
+          endExpr <- return $ compileExpr env (offset + sizeOf AST.I32) endExpr
+
+          env <- return $ insertVariable variableName (Variable forVariableOffset) env
+          block <- return $ compileExpr env (offset + 3 * sizeOf AST.I32) block
+          (state, beginVariableAddress) <- beginExpr state
+          (state, endVariableAddress) <- endExpr state
+          let beginVariable = memoryRead beginVariableAddress state
+          let endVariable = memoryRead endVariableAddress state
+          unless (beginVariable <= endVariable) $ Left (format "Runtime exception: invalid range (%0, %1) in for-range." [show beginVariable, show endVariable], state)
+          let forVariableAddress = callPointer state |+ forVariableOffset
+          let forRuns = map (\x -> fmap fst . block . (memoryWrite forVariableAddress x)) $ range beginVariable endVariable
+          state <- foldl' (>>=) (return state) forRuns
+          return (state, heapPointer)
+        Imd.While conditionExpr -> do
+          conditionExpr <- return $ compileExpr env offset conditionExpr
+          block <- return $ compileExpr env (offset + sizeOf AST.Bool) block
+          let loopRun = block >=> return . fst >=> conditionExpr
+          let ifConditionThenCall f (state, conditionAddress) = if memoryRead conditionAddress state == 1 then f state else return state
+          let loop = loopRun >=> ifConditionThenCall loop
+          state <- (conditionExpr >=> ifConditionThenCall loop) state
+          return (state, heapPointer)
+        _ -> undefined
     Imd.FlowControl   _         -> undefined
     Imd.BindVariables bindings initializer suffix -> do
       let initializerType = typeOf initializer

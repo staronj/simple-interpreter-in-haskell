@@ -5,7 +5,10 @@ module Intermediate.Build(fromAST) where
 import Data.Int (Int32)
 import Data.List (foldl', uncons)
 import Data.Maybe (fromMaybe)
+import Control.Exception.Base (assert)
 import Control.Monad (void)
+
+import Debug.Trace (trace)
 
 import Intermediate
 import FormatString
@@ -122,7 +125,8 @@ fromFunction env function = do
   env <- return $ bindingsInserter env
   expr <- fromBlock env (AST.body function)
 
-  return Function { name = uid $ findFunction env $ AST.name function, body = expr, parameter = parametersAsTuple, bindings = Map.toList $ fmap path $ variables env }
+
+  trace (show expr) $ assert (typeOf expr == AST.resultType function) $ return Function { name = uid $ findFunction env $ AST.name function, body = expr, parameter = parametersAsTuple, bindings = Map.toList $ fmap path $ variables env }
 
 type HeteromorphicExpr = Either (Expr 'LValue) (Expr 'RValue)
 
@@ -168,7 +172,13 @@ fromStmt env stmt suffix =
       let loop = Loop (fromWhateverExpr While expr) block
       return $ Sequence loop compiledSuffix
     AST.IterableForLoop ident expr block        -> undefined
-    AST.RangeForLoop ident expr1 expr2 block    -> undefined
+    AST.RangeForLoop ident expr1 expr2 block    -> do
+      expr1 <- fmap buildRValueExpr $ fromExpr env expr1
+      expr2 <- fmap buildRValueExpr $ fromExpr env expr2
+      env <- return $ insertVariable ident Variable { variableType = AST.I32, path = [] } env
+      block <- fromBlock env block
+      let loop = Loop (ForRange ident expr1 expr2) block
+      return $ Sequence loop compiledSuffix
     AST.Break                                   -> undefined
     AST.Continue                                -> undefined
     AST.LetStmt pattern valueType expr'          -> do
@@ -189,7 +199,10 @@ fromExpr env expr = case expr of
     expr2 <- return $ buildRValueExpr expr2
     let (valueType, name) = binaryOperatorInfo kind
     return $ Right $ FunctionCall valueType name [expr1, expr2]
-  AST.UnaryOperator   expr kind           -> undefined
+  AST.UnaryOperator   expr kind           -> do
+    expr <- fmap buildRValueExpr $ fromExpr env expr
+    let (valueType, name) = unaryOperatorInfo kind
+    return $ Right $ FunctionCall valueType name [expr]
   AST.Identifier      ident               -> return $ Left $ Identifier (variableType $ findVariable env ident) ident
   AST.Equal expr1 expr2                   -> do
     expr1 <- fromExpr env expr1
@@ -241,3 +254,7 @@ binaryOperatorInfo kind = case kind of
   AST.Multiply  -> (AST.I32, "$multiply")
   AST.Divide    -> (AST.I32, "$divide")
   AST.Modulo    -> (AST.I32, "$modulo")
+
+unaryOperatorInfo :: AST.UnaryOperatorKind -> (AST.Type, AST.Ident)
+unaryOperatorInfo AST.Not = (AST.Bool, "$not")
+unaryOperatorInfo AST.Negate = (AST.I32, "$negate")

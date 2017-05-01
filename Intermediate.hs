@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, KindSignatures, DataKinds #-}
+{-# LANGUAGE GADTs, KindSignatures, DataKinds, RankNTypes, FlexibleInstances #-}
 
 module Intermediate where
 
@@ -39,6 +39,27 @@ data Expr :: ExprKind -> * where
   -- Evaluates both expressions and returns value of second
   Sequence ::       Expr a -> Expr b -> Expr b
 
+instance Show (Expr a) where
+  show expr = case expr of
+    FunctionCall  t _ _     -> "FunctionCall"
+    TupleLookup   e n       -> "TupleLookup"
+    ArrayLookup   e _       -> "ArrayLookup"
+    Assign        _ _       -> "Assign"
+    Equal         _ _       -> "Equal"
+    Dereference   t _       -> "Dereference"
+    Borrow        t _       -> "Borrow"
+    Identifier    t _       -> "Identifier"
+    Literal       l         -> "Literal"
+    Array         c         -> "Array"
+    Tuple         es        -> "Tuple"
+    IfElse        _ e _     -> "IfElse"
+    Materialize   t         -> "Materialize"
+    If            _ _       -> "If"
+    Loop          _ _       -> "Loop"
+    FlowControl   _         -> "FlowControl"
+    BindVariables _ _ _     -> "BindVariables"
+    Sequence      _ e       -> "Sequence"
+
 data LoopConstructor :: * where
   Forever ::    LoopConstructor
   While ::      Expr a -> LoopConstructor
@@ -73,8 +94,9 @@ instance TypeOf (Expr e) where
     If            _ _       -> AST.unit
     Loop          _ _       -> AST.unit
     FlowControl   _         -> AST.unit
-    BindVariables _ _ _     -> AST.unit
+    BindVariables _ _ e     -> typeOf e
     Sequence      _ e       -> typeOf e
+
 
 instance TypeOf ArrayConstructor where
   typeOf array = case array of

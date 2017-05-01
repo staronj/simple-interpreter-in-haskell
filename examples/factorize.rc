@@ -1,0 +1,24 @@
+fn main() {
+  let n = readI32();
+  let (factors, factorsCount) = factorize(n);
+  for i in 0 .. factorsCount {
+    writeI32(factors[i]);
+  }
+}
+
+fn factorize (mut n : i32) -> ([i32; 32], i32) {
+  let mut count = 0;
+  let mut factors = [1; 32];
+  let mut d = 2;
+  while n != 0 {
+    if n % d == 0 {
+      n = n / d;
+      factors[count] = d;
+      count = count + 1;
+    }
+    else {
+      d = d + 1;
+    }
+  }
+  (factors, count)
+}

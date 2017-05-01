@@ -20,7 +20,7 @@ test_type_checking: TypeCheckUnitTests.exe
 	$(COMPILER) $(FLAGS) --make $< -o $@
 
 interpreter.exe: Main.hs $(PARSER_FILES) $(SOURCES)
-	$(COMPILER) $(FLAGS) -prof --make Main.hs -o interpreter.exe
+	$(COMPILER) $(FLAGS) --make Main.hs -o interpreter.exe
 
 $(PARSER_FILES): grammar.bnfc
 	bnfc -m --haskell-gadt grammar.bnfc  --outputdir=obj
