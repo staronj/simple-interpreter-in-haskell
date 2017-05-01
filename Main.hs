@@ -11,6 +11,7 @@ import qualified System.Console.GetOpt as Opt
 import System.Environment (getArgs)
 
 import qualified AST
+import qualified AST.Print as AST
 import FormatString
 import TypeCheck
 import Compile

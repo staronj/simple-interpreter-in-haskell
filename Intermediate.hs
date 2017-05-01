@@ -32,6 +32,8 @@ data Expr :: ExprKind -> * where
 
   -- Flow control instructions: break and continue
   FlowControl ::    FlowControlType -> Expr 'RValue
+
+  -- Variable binding - mapping Ident -> position in tuple
   BindVariables ::  [(AST.Ident, [Int32])] -> Expr 'RValue -> Expr 'RValue -> Expr 'RValue
 
   -- Evaluates both expressions and returns value of second
@@ -85,6 +87,6 @@ instance TypeOf AST.Literal where
     AST.LiteralI32  _ -> AST.I32
     AST.LiteralBool _ -> AST.Bool
 
-data Function = Function { name :: AST.Ident, body :: Expr 'RValue }
+data Function = Function { name :: AST.Ident, bindings :: [(AST.Ident, [Int32])], parameter :: AST.Type, body :: Expr 'RValue }
 
-data Program = Program { functions :: [Function], mainUid :: AST.Ident }
+data Program = Program { functions :: [Function], mainUid :: String }

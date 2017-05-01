@@ -48,6 +48,14 @@ data Env =
   , functionCounter :: Int
   , variables :: VEnv }
 
+initialEnv :: Env
+initialEnv = Env functionEntries functionCounter variables where
+  functionEntries = Map.fromList [("readI32", readI32), ("writeI32", writeI32)]
+  readI32 = FunctionEntry "readI32" AST.I32
+  writeI32 = FunctionEntry "writeI32" AST.unit
+  functionCounter = 0
+  variables = Map.empty
+
 insertVariable :: AST.Ident -> Variable -> Env -> Env
 insertVariable name variable env = env' where
   env' = env { variables = variables' }
@@ -103,18 +111,18 @@ insertFunctions env functions =
     return env'
 
 fromProgram :: AST.Program -> IntermediateBuilder Env
-fromProgram program =
-  let initialEnv = Env Map.empty 0 Map.empty in
-  insertFunctions initialEnv (AST.functions program)
+fromProgram program = insertFunctions initialEnv (AST.functions program)
 
 fromFunction :: Env -> AST.FunctionDeclaration -> IntermediateBuilder Function
 fromFunction env function = do
-  let parameters' = map (\funParam -> insertPattern (AST.pattern funParam) (AST.valueType funParam)) $ AST.parameters function
+  let bindingsAsTuple = AST.PatternTuple $ map AST.pattern $ AST.parameters function
+  let parametersAsTuple = AST.Tuple $ map AST.valueType $ AST.parameters function
+  let bindingsInserter = insertPattern bindingsAsTuple parametersAsTuple
   env <- return $ env { variables = Map.empty }
-  env <- return $ (foldl' (.) id parameters') env
+  env <- return $ bindingsInserter env
   expr <- fromBlock env (AST.body function)
 
-  return Function { name = uid $ findFunction env $ AST.name function, body = expr}
+  return Function { name = uid $ findFunction env $ AST.name function, body = expr, parameter = parametersAsTuple, bindings = Map.toList $ fmap path $ variables env }
 
 type HeteromorphicExpr = Either (Expr 'LValue) (Expr 'RValue)
 
@@ -127,6 +135,9 @@ buildRValueExpr = either Materialize id
 getRValueExpr :: Either (Expr 'LValue) (Expr 'RValue) -> Expr 'RValue
 getRValueExpr = either (error "Trying to get Expr 'RValue from Left $ Expr 'LValue.") id
 
+getLValueExpr :: Either (Expr 'LValue) (Expr 'RValue) -> Expr 'LValue
+getLValueExpr = either id $ error "Trying to get Expr 'LValue from Right $ Expr 'RValue."
+
 fromWhateverExpr :: (forall a . Expr a -> b) -> HeteromorphicExpr -> b
 fromWhateverExpr f = either f f
 
@@ -138,49 +149,63 @@ fromBlock env block@(AST.Block stmts expr) =
 fromBlockSuffix :: Env -> [AST.Stmt] -> AST.Expr -> IntermediateBuilder (Expr 'RValue)
 fromBlockSuffix env stmts expr = case uncons stmts of
   Nothing -> fromExpr env expr >>= return.buildRValueExpr
-  Just (stmt, stmts) -> do
-    suffix <- fromBlockSuffix env stmts expr
-    fromStmt env stmt suffix
+  Just (stmt, stmts) -> fromStmt env stmt (stmts, expr)
 
-fromStmt :: Env -> AST.Stmt -> (Expr 'RValue) -> IntermediateBuilder (Expr 'RValue)
-fromStmt env stmt suffix = case stmt of
-  AST.FunDeclStmt funDecl                     -> undefined
-  AST.If expr block                           -> undefined
-  AST.Stmt expr                               -> do
-    expr <- fromExpr env expr
-    return $ fromWhateverExpr Sequence expr suffix
-  AST.StrictStmt expr                         -> undefined
-  AST.Loop block                              -> undefined
-  AST.While expr block                        -> do
-    expr <- fromExpr env expr
-    block <- fromBlock env block
-    let loop = Loop (fromWhateverExpr While expr) block
-    return $ Sequence loop suffix
-  AST.IterableForLoop ident expr block        -> undefined
-  AST.RangeForLoop ident expr1 expr2 block    -> undefined
-  AST.Break                                   -> undefined
-  AST.Continue                                -> undefined
-  AST.LetStmt pattern valueType expr'          -> do
-    expr' <- fromExpr env expr'
-    expr' <- return $ buildRValueExpr expr'
-    env <- return $ insertPattern pattern (typeOf expr') env
-    names <- return $ variableNamesFromPattern pattern
-    bindings <- return $ map (\n -> (n, path $ findVariable env n)) names
-    return $ BindVariables bindings expr' suffix
+fromStmt :: Env -> AST.Stmt -> ([AST.Stmt], AST.Expr) -> IntermediateBuilder (Expr 'RValue)
+fromStmt env stmt suffix =
+  (uncurry $ fromBlockSuffix env) suffix >>= \s -> let compiledSuffix = s in
+  case stmt of
+    AST.FunDeclStmt funDecl                     -> undefined
+    AST.If expr block                           -> undefined
+    AST.Stmt expr                               -> do
+      expr <- fromExpr env expr
+      return $ fromWhateverExpr Sequence expr compiledSuffix
+    AST.StrictStmt expr                         -> undefined
+    AST.Loop block                              -> undefined
+    AST.While expr block                        -> do
+      expr <- fromExpr env expr
+      block <- fromBlock env block
+      let loop = Loop (fromWhateverExpr While expr) block
+      return $ Sequence loop compiledSuffix
+    AST.IterableForLoop ident expr block        -> undefined
+    AST.RangeForLoop ident expr1 expr2 block    -> undefined
+    AST.Break                                   -> undefined
+    AST.Continue                                -> undefined
+    AST.LetStmt pattern valueType expr'          -> do
+      expr' <- fromExpr env expr'
+      expr' <- return $ buildRValueExpr expr'
+      env <- return $ insertPattern pattern (typeOf expr') env
+      compiledSuffix <- (uncurry $ fromBlockSuffix env) suffix
+      names <- return $ variableNamesFromPattern pattern
+      bindings <- return $ map (\n -> (n, path $ findVariable env n)) names
+      return $ BindVariables bindings expr' compiledSuffix
 
 fromExpr :: Env -> AST.Expr -> IntermediateBuilder HeteromorphicExpr
 fromExpr env expr = case expr of
-  AST.BinaryOperator  expr1 expr2 kind    -> undefined
+  AST.BinaryOperator  expr1 expr2 kind    -> do
+    expr1 <- fromExpr env expr1
+    expr2 <- fromExpr env expr2
+    expr1 <- return $ buildRValueExpr expr1
+    expr2 <- return $ buildRValueExpr expr2
+    let (valueType, name) = binaryOperatorInfo kind
+    return $ Right $ FunctionCall valueType name [expr1, expr2]
   AST.UnaryOperator   expr kind           -> undefined
   AST.Identifier      ident               -> return $ Left $ Identifier (variableType $ findVariable env ident) ident
-  AST.Equal expr1 expr2                   -> undefined
+  AST.Equal expr1 expr2                   -> do
+    expr1 <- fromExpr env expr1
+    expr2 <- fromExpr env expr2
+    return $ Right $ fromWhateverExpr (fromWhateverExpr Equal expr1) expr2
   AST.NotEqual expr1 expr2                -> do
     expr1 <- fromExpr env expr1
     expr2 <- fromExpr env expr2
     expr1 <- return $ buildRValueExpr expr1
     expr2 <- return $ buildRValueExpr expr2
     return $ Right $ FunctionCall AST.Bool "$not" [Equal expr1 expr2]
-  AST.Assign expr1 expr2                  -> undefined
+  AST.Assign expr1 expr2                  -> do
+    expr1 <- fromExpr env expr1
+    expr2 <- fromExpr env expr2
+    expr1 <- return $ getLValueExpr expr1
+    return $ Right $ fromWhateverExpr (Assign expr1) expr2
   AST.ArrayLookup expr1 expr2             -> undefined
   AST.Dereference expr                    -> undefined
   AST.Borrow expr                         -> undefined
@@ -200,4 +225,19 @@ fromExpr env expr = case expr of
     exprs <- return $ map buildRValueExpr exprs
     return $ Right $ Tuple exprs
   AST.BlockExpr       block               -> undefined
-  AST.IfElse          expr block1 block2  -> undefined
+  AST.IfElse          expr block1 block2  -> do
+    expr <- fromExpr env expr
+    block1 <- fromBlock env block1
+    block2 <- fromBlock env block2
+    return $ Right $ fromWhateverExpr IfElse expr block1 block2
+
+binaryOperatorInfo :: AST.BinaryOperatorKind -> (AST.Type, AST.Ident)
+binaryOperatorInfo kind = case kind of
+  AST.Or        -> (AST.Bool, "$or")
+  AST.And       -> (AST.Bool, "$and")
+  AST.Less      -> (AST.Bool, "$less")
+  AST.Add       -> (AST.I32, "$add")
+  AST.Subtract  -> (AST.I32, "$subtract")
+  AST.Multiply  -> (AST.I32, "$multiply")
+  AST.Divide    -> (AST.I32, "$divide")
+  AST.Modulo    -> (AST.I32, "$modulo")

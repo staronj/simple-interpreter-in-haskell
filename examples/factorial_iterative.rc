@@ -1,0 +1,13 @@
+fn factorial(i32 n) -> i32 {
+  let mut result = 1;
+  for i in 1..(n + 1) {
+    result = result * i;
+  }
+  result
+}
+
+fn main() {
+  let n = readI32();
+  let n_factorial = factorial(n);
+  writeI32(n_factorial);
+}

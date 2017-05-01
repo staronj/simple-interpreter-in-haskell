@@ -1,0 +1,4 @@
+fn main() {
+  let n = readI32();
+  writeI32(n)
+}
