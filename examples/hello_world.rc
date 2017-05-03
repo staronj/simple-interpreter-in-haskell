@@ -1,3 +1,5 @@
+// Jakub Staroń, 2017
+
 fn main() {
 	writeI32(42)
 }

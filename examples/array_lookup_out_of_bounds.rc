@@ -1,0 +1,6 @@
+// Jakub Staroń, 2017
+
+fn main() {
+  let array = [1; 100];
+  writeI32(array[100]);
+}

@@ -70,8 +70,8 @@ tests =
   test True "if-else-values-minimal-example"
     "fn main() { if true { 42 } else { 31 }; }",
 
---  test True "if-else-values-in-block"
---    "fn main() { { if true { 42 } else { 31 } }; }",
+  test True "if-else-values-in-block"
+    "fn main() { { if true { 42 } else { 31 } }; }",
 
   test False "if-else-wrong-condition-type"
     "fn main() { if 42 { } else { } }",

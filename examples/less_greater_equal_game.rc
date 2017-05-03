@@ -1,0 +1,17 @@
+// Jakub Staroń, 2017
+
+fn compare(a : i32, b : i32) -> i32 {
+  if a == b { 0 } else { if a < b { -1 } else { 1 } }
+}
+
+fn main() {
+  let secret = readI32();
+  loop {
+      let n = readI32();
+      let cmp = compare(secret, n);
+      writeI32(cmp);
+      if cmp == 0 {
+        break;
+      }
+  }
+}

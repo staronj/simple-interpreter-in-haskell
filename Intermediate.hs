@@ -2,13 +2,13 @@
 
 module Intermediate where
 
-import Data.Int
+import Data.Int (Int32)
 import qualified AST(Ident, Type(..), unit, Literal(..))
 
-data ExprKind = RValue | LValue
+data ExprKind = LValue | RValue
 
 data Expr :: ExprKind -> * where
-  FunctionCall ::   AST.Type -> AST.Ident -> [Expr 'RValue] -> Expr 'RValue
+  FunctionCall ::   AST.Type -> AST.Ident -> Expr 'RValue -> Expr 'RValue
   TupleLookup ::    Expr a -> Int32 -> Expr a
   ArrayLookup ::    Expr a -> Expr b -> Expr a
 
@@ -81,8 +81,8 @@ instance TypeOf (Expr e) where
     FunctionCall  t _ _     -> t
     TupleLookup   e n       -> let AST.Tuple ts = typeOf e in ts !! fromIntegral n
     ArrayLookup   e _       -> let AST.Array t _ = typeOf e in t
-    Assign        _ _       -> AST.unit
-    Equal         _ _       -> AST.Bool
+    Assign        {}        -> AST.unit
+    Equal         {}        -> AST.Bool
     Dereference   t _       -> t
     Borrow        t _       -> t
     Identifier    t _       -> t
@@ -91,12 +91,11 @@ instance TypeOf (Expr e) where
     Tuple         es        -> AST.Tuple $ map typeOf es
     IfElse        _ e _     -> typeOf e
     Materialize   t         -> typeOf t
-    If            _ _       -> AST.unit
-    Loop          _ _       -> AST.unit
-    FlowControl   _         -> AST.unit
+    If            {}        -> AST.unit
+    Loop          {}        -> AST.unit
+    FlowControl   {}        -> AST.unit
     BindVariables _ _ e     -> typeOf e
     Sequence      _ e       -> typeOf e
-
 
 instance TypeOf ArrayConstructor where
   typeOf array = case array of
@@ -109,6 +108,14 @@ instance TypeOf AST.Literal where
     AST.LiteralI32  _ -> AST.I32
     AST.LiteralBool _ -> AST.Bool
 
-data Function = Function { name :: AST.Ident, bindings :: [(AST.Ident, [Int32])], parameter :: AST.Type, body :: Expr 'RValue }
+data Function =
+  Function
+  { name :: AST.Ident
+  , bindings :: [(AST.Ident, [Int32])]
+  , parameter :: AST.Type
+  , body :: Expr 'RValue }
 
-data Program = Program { functions :: [Function], mainUid :: String }
+data Program =
+  Program
+  { functions :: [Function]
+  , mainUid :: String }

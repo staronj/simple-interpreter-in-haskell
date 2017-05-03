@@ -1,3 +1,5 @@
+// Jakub Staroń, 2017
+
 fn main() {
   for x in 2..1 {
 

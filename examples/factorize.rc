@@ -1,3 +1,5 @@
+// Jakub Staroń, 2017
+
 fn main() {
   let n = readI32();
   let (factors, factorsCount) = factorize(n);
@@ -10,7 +12,7 @@ fn factorize (mut n : i32) -> ([i32; 32], i32) {
   let mut count = 0;
   let mut factors = [1; 32];
   let mut d = 2;
-  while n != 0 {
+  while n != 1 {
     if n % d == 0 {
       n = n / d;
       factors[count] = d;

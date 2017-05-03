@@ -2,22 +2,29 @@
 
 module TypeCheck (typeCheck) where
 
-import Data.Int (Int32)
 import Data.List (foldl', intercalate)
 import Control.Monad
+import Control.Monad.Except (throwError)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import qualified AST
-import FormatString
+import FormatString (format)
 
 findDuplicate :: Ord a => [a] -> Maybe a
 findDuplicate xs = either Just (const Nothing) $ foldM insert Set.empty xs where
   insert :: Ord a => Set.Set a -> a -> Either a (Set.Set a)
   insert s x = if Set.member x s then Left x else Right $ Set.insert x s
 
-data Variable = Variable { varType :: AST.Type, mutable :: Bool }
-data Function = Function { parameters :: [AST.Type], resultType :: AST.Type}
+data Variable =
+  Variable
+  { varType :: AST.Type
+  , mutable :: Bool }
+
+data Function =
+  Function
+  { parameters :: [AST.Type]
+  , resultType :: AST.Type}
 
 type VEnv = Map.Map AST.Ident Variable
 type FEnv = Map.Map AST.Ident Function
@@ -83,6 +90,9 @@ outOfBoundsTupleLookupMessage env valueType n = format "attempted out-of-bounds 
 arrayFromInvalidRangeMessage :: (Num a, Show a) => Env -> a -> a -> String
 arrayFromInvalidRangeMessage env begin end = format "trying to create array from invalid range `(%0, %1)`" [show begin, show end, show $ path env]
 
+controlFlowStmtOutsideOfLoopMessage :: Env -> String
+controlFlowStmtOutsideOfLoopMessage env = format "usage of control flow instruction oustide of loop at \n%0" [show $ path env]
+
 -- Messages End
 
 findFunction :: AST.Ident -> Env -> Either String Function
@@ -109,13 +119,14 @@ insertPattern pattern valueType env = case pattern of
   AST.PatternMutableVariable name     -> return $ insertVariable name (Variable valueType True) env
   AST.PatternIgnore                   -> return env
   AST.PatternTuple pattern'           -> case valueType of
-    AST.Tuple types -> do
-      let pattern_length = length pattern'
-      let types_length = length types
-      unless (pattern_length == types_length) $ Left $ tupleLengthNotMatchMessage env types_length pattern_length
-      let pairs = map (uncurry insertPattern) $ zip pattern' types
-      foldl' (>=>) return pairs env
-    _               -> Left $ couldNotMatchTypeWithTupleMessage env valueType
+    AST.Tuple types ->
+      let patternLength = length pattern' in
+      let typesLength = length types in
+      do
+        unless (patternLength == typesLength) $ throwError $ tupleLengthNotMatchMessage env typesLength patternLength
+        let pairs = zipWith insertPattern pattern' types
+        foldl' (>=>) return pairs env
+    _               -> throwError $ couldNotMatchTypeWithTupleMessage env valueType
 
 pushSubpath :: String -> String -> Env -> Env
 pushSubpath nodeType name env = env { path = Path $ (nodeType, name) : oldPath} where
@@ -129,58 +140,66 @@ setSubpath nodeType name env = env { path = Path $ (nodeType, name) : oldPath} w
 
 assertTypesEqual :: Env -> AST.Type -> AST.Type -> Either String ()
 assertTypesEqual env type1 type2 =
-  unless (type1 == type2) $ Left $ couldNotMatchTypesMessage env type1 type2
+  unless (type1 == type2) $ throwError $ couldNotMatchTypesMessage env type1 type2
 
 assertMutable :: Env -> Variable -> Either String ()
-assertMutable env variable = unless (mutable variable) $ Left $ expectedMutableVariableMessage env
+assertMutable env variable = unless (mutable variable) $ throwError $ expectedMutableVariableMessage env
 
 assertIsArray :: Env -> AST.Type -> Either String ()
 assertIsArray env valueType = case valueType of
     AST.Array {}  -> return ()
-    _             -> Left $ expectedArrayMessage env valueType
+    _             -> throwError $ expectedArrayMessage env valueType
 
 assertIsTuple :: Env -> AST.Type -> Either String ()
 assertIsTuple env valueType = case valueType of
     AST.Tuple {}  -> return ()
-    _             -> Left $ expectedTupleMessage env valueType
+    _             -> throwError $ expectedTupleMessage env valueType
 
 assertFunctionArguments :: Env -> Function -> AST.Ident -> [AST.Type] -> Either String ()
-assertFunctionArguments env function ident types = do
-    let types_length = length types
-    let parameters_length = length $ parameters function
-    unless (types_length == parameters_length) $ Left $ invalidNumberOfArgumentsMessage env ident parameters_length types_length
-    zipWithM_ (assertTypesEqual env) types $ parameters function
+assertFunctionArguments env function ident types =
+    let typesLength = length types in
+    let parametersLength = length $ parameters function in
+    do
+      unless (typesLength == parametersLength) $ throwError $ invalidNumberOfArgumentsMessage env ident parametersLength typesLength
+      zipWithM_ (assertTypesEqual env) types $ parameters function
 
+assertInLoop :: Env -> Either String ()
+assertInLoop env = unless (inLoop env) $ throwError $ controlFlowStmtOutsideOfLoopMessage env
 -- Assertions end
 
 initialEnv :: Env
-initialEnv = Env functions variables (Path []) False where
+initialEnv =
+  Env
+  { functions = functions
+  , variables = variables
+  , path = Path []
+  , inLoop = False } where
     functions = Map.fromList [("readI32", readI32), ("writeI32", writeI32)]
+    variables = Map.empty
     readI32 = Function { parameters = [], resultType = AST.I32 }
     writeI32 = Function { parameters = [AST.I32], resultType = AST.unit }
-    variables = Map.empty
 
 typeCheck :: AST.Program -> Either String AST.Program
 typeCheck ast =
     let functionDeclarations = AST.functions ast in
     do
         env <- insertFunctions functionDeclarations initialEnv
-        sequence_ $ map (flip typeCheckFunction env) functionDeclarations
+        mapM_ (`typeCheckFunction` env) functionDeclarations
         main <- findFunction "main" env
-        unless (parameters main == []) $ Left mainFunctionMustTakeNoArgumentsMessage
-        unless (resultType main == AST.unit) $ Left mainFunctionMustReturnUnitMessage
+        unless (null $ parameters main) $ throwError mainFunctionMustTakeNoArgumentsMessage
+        unless (resultType main == AST.unit) $ throwError mainFunctionMustReturnUnitMessage
         return ast
 
 insertFunctions :: [AST.FunctionDeclaration] -> Env -> Either String Env
 insertFunctions functions env =
     let duplicateName = findDuplicate $ map AST.name functions in
     do
-        maybe (return ()) (Left . (duplicatedFunctionIdentifierInScopeMessage env)) duplicateName
+        maybe (return ()) (throwError . duplicatedFunctionIdentifierInScopeMessage env) duplicateName
         return $ foldl' (flip insertASTFunction) env functions
         where
           insertASTFunction :: AST.FunctionDeclaration -> Env -> Env
-          insertASTFunction function = insertFunction ident function' where
-              ident = AST.name function
+          insertASTFunction function = insertFunction name function' where
+              name = AST.name function
               function' = Function parameters resultType
               parameters = map AST.valueType (AST.parameters function)
               resultType = AST.resultType function
@@ -189,7 +208,7 @@ typeCheckFunction :: AST.FunctionDeclaration -> Env -> Either String ()
 typeCheckFunction fun env = do
         env <- return $ pushSubpath "function" (AST.name fun) env
         let parameters' = map (\funParam -> insertPattern (AST.pattern funParam) (AST.valueType funParam)) $ AST.parameters fun
-        env' <- (foldl' (>=>) return parameters') env
+        env' <- foldl' (>=>) return parameters' env
         blockType <- typeCheckBlock (AST.body fun) env'
         let resultType = AST.resultType fun
         assertTypesEqual env blockType resultType
@@ -201,21 +220,21 @@ typeCheckBlock block@(AST.Block stmts expr) env = do
         env <- return $ pushSubpath "" "" env
         stmts <- return $ map typeCheckStmt stmts
         stmts <- return $ zipWith (\i s -> s . setSubpath "stmt" (show i)) [0..] stmts
-        env <- (foldl' (>=>) return stmts) env
-        liftM varType $ typeCheckExpr expr env
+        env <- foldl' (>=>) return stmts env
+        varType <$> typeCheckExpr expr env
 
 typeCheckStmt :: AST.Stmt -> Env -> Either String Env
 typeCheckStmt stmt env = case stmt of
     AST.FunDeclStmt funDecl                     -> typeCheckFunction funDecl env >> return env
     AST.If expr block                           -> do
-        exprType <- liftM varType $ typeCheckExpr expr env
+        exprType <- varType <$> typeCheckExpr expr env
         assertTypesEqual env exprType AST.Bool
         blockType <- typeCheckBlock block env
         assertTypesEqual env blockType AST.unit
         return env
     AST.Stmt expr                               -> typeCheckExpr expr env >> return env
     AST.StrictStmt expr                         -> do
-        exprType <- liftM varType $ typeCheckExpr expr env
+        exprType <- varType <$> typeCheckExpr expr env
         assertTypesEqual env exprType AST.unit
         return env
     AST.Loop block                              -> do
@@ -223,34 +242,36 @@ typeCheckStmt stmt env = case stmt of
         assertTypesEqual env blockType AST.unit
         return env
     AST.While expr block                        -> do
-        exprType <- liftM varType $ typeCheckExpr expr env
+        exprType <- varType <$> typeCheckExpr expr env
         blockType <- typeCheckBlock block env
         assertTypesEqual env exprType AST.Bool
         assertTypesEqual env blockType AST.unit
         return env
     AST.IterableForLoop ident expr block        -> do
-        exprType <- liftM varType $ typeCheckExpr expr env
+        exprType <- varType <$> typeCheckExpr expr env
         assertIsArray env exprType
         let AST.Array valueType _ = exprType
-        let env' = insertVariable ident (Variable { varType = valueType, mutable = False }) env
+        let env' = insertVariable ident Variable { varType = valueType, mutable = False } env
         blockType <- typeCheckBlock block env'
         assertTypesEqual env blockType AST.unit
         return env
     AST.RangeForLoop ident expr1 expr2 block    -> do
-        exprType1 <- liftM varType $ typeCheckExpr expr1 env
-        exprType2 <- liftM varType $ typeCheckExpr expr2 env
-        let env' = insertVariable ident (Variable { varType = AST.I32, mutable = False }) env
+        exprType1 <- varType <$> typeCheckExpr expr1 env
+        exprType2 <- varType <$> typeCheckExpr expr2 env
+        let env' = insertVariable ident Variable { varType = AST.I32, mutable = False } env
         blockType <- typeCheckBlock block env'
         assertTypesEqual env exprType1 AST.I32
         assertTypesEqual env exprType2 AST.I32
         assertTypesEqual env blockType AST.unit
         return env
     AST.Break                                   -> do
+        assertInLoop env
         return env
     AST.Continue                                -> do
+        assertInLoop env
         return env
     AST.LetStmt pattern valueType expr          -> do
-        exprType <- liftM varType $ typeCheckExpr expr env
+        exprType <- varType <$> typeCheckExpr expr env
         case valueType of
             Nothing -> return ()
             Just valueType -> assertTypesEqual env valueType exprType
@@ -290,12 +311,14 @@ typeCheckExpr expr env = case expr of
 
     AST.Identifier      ident               -> findVariable ident env
     AST.Equal expr1 expr2                   -> do
-      exprType1 <- liftM varType $ typeCheckExpr expr1 env
-      exprType2 <- liftM varType $ typeCheckExpr expr2 env
+      exprType1 <- varType <$> typeCheckExpr expr1 env
+      exprType2 <- varType <$> typeCheckExpr expr2 env
+      assertTypesEqual env exprType2 exprType1
       return $ Variable AST.Bool False
     AST.NotEqual expr1 expr2                   -> do
-        exprType1 <- liftM varType $ typeCheckExpr expr1 env
-        exprType2 <- liftM varType $ typeCheckExpr expr2 env
+        exprType1 <- varType <$> typeCheckExpr expr1 env
+        exprType2 <- varType <$> typeCheckExpr expr2 env
+        assertTypesEqual env exprType2 exprType1
         return $ Variable AST.Bool False
     AST.Assign expr1 expr2 -> do
         exprVar1 <- typeCheckExpr expr1 env
@@ -314,15 +337,15 @@ typeCheckExpr expr env = case expr of
         assertTypesEqual env exprType2 AST.I32
         let AST.Array valueType _ = exprType1
         return $ exprVar1 { varType = valueType }
-    AST.Dereference expr -> undefined
-    AST.Borrow expr -> undefined
-    AST.MutableBorrow expr -> undefined
-    AST.LiteralExpr     literal             -> do
+    AST.Dereference expr -> error "Not implemented."
+    AST.Borrow expr -> error "Not implemented."
+    AST.MutableBorrow expr -> error "Not implemented."
+    AST.LiteralExpr     literal             ->
         case literal of
             AST.LiteralI32 _    -> return $ Variable AST.I32 False
             AST.LiteralBool _   -> return $ Variable AST.Bool False
     AST.FunctionCall    ident exprs         -> do
-        variables <- mapM (flip typeCheckExpr env) exprs
+        variables <- mapM (`typeCheckExpr` env) exprs
         let types = map varType variables
         function <- findFunction ident env
         assertFunctionArguments env function ident types
@@ -332,30 +355,30 @@ typeCheckExpr expr env = case expr of
       let exprType = varType exprVar
       assertIsTuple env exprType
       let AST.Tuple types = exprType
-      unless (length types > fromIntegral n) $ Left $ outOfBoundsTupleLookupMessage env exprType n
+      unless (length types > fromIntegral n) $ throwError $ outOfBoundsTupleLookupMessage env exprType n
       return $ exprVar { varType = types !! fromIntegral n }
     AST.ArrayElements   exprs               -> do
-        exprs <- mapM (flip typeCheckExpr env) exprs
+        exprs <- mapM (`typeCheckExpr` env) exprs
         exprs <- return $ map varType exprs
         when (null exprs) $ error "Internal interpreter error: empty exprs list in AST.ArrayElements."
         let commonType = head exprs
         mapM_ (assertTypesEqual env commonType) exprs
         return $ Variable (AST.Array commonType $ fromIntegral $ length exprs) False
     AST.ArrayRepeat     expr integer        -> do
-        exprType <- liftM varType $ typeCheckExpr expr env
+        exprType <- varType <$> typeCheckExpr expr env
         return $ Variable (AST.Array exprType integer) False
     AST.ArrayRange      begin end           -> do
-        unless (begin < end) $ Left $ arrayFromInvalidRangeMessage env begin end
+        unless (begin < end) $ throwError $ arrayFromInvalidRangeMessage env begin end
         return $ Variable (AST.Array AST.I32 (end - begin)) False
     AST.TupleConstruct  exprs               -> do
-        variables <- mapM (flip typeCheckExpr env) exprs
+        variables <- mapM (`typeCheckExpr` env) exprs
         let types = map varType variables
         return $ Variable (AST.Tuple types) False
     AST.BlockExpr       block               -> do
         blockType <- typeCheckBlock block env
         return $ Variable blockType False
     AST.IfElse          expr block1 block2  -> do
-        exprType <- liftM varType $ typeCheckExpr expr env
+        exprType <- varType <$> typeCheckExpr expr env
         blockType1 <- typeCheckBlock block1 env
         blockType2 <- typeCheckBlock block2 env
         assertTypesEqual env exprType AST.Bool
