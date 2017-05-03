@@ -1,4 +1,5 @@
 -- Jakub Staroń, 2017
+
 {-# LANGUAGE RankNTypes, TypeSynonymInstances, GADTs #-}
 
 module Compile (compile, execute) where

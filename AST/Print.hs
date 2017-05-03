@@ -1,3 +1,5 @@
+-- Jakub Staroń, 2017
+
 module AST.Print (prettyPrint) where
 
 import Data.Tree (Tree(..), drawTree)

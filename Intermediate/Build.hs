@@ -1,3 +1,5 @@
+-- Jakub Staroń, 2017
+
 {-# LANGUAGE GADTs, DataKinds, RankNTypes, FlexibleInstances, DeriveFunctor #-}
 
 module Intermediate.Build (fromAST) where

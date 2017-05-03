@@ -1,3 +1,5 @@
+-- Jakub Staroń, 2017
+
 {-# LANGUAGE GADTs, KindSignatures, DataKinds, RankNTypes, FlexibleInstances #-}
 
 module Intermediate where

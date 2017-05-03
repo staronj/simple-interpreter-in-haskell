@@ -1,4 +1,5 @@
 -- Jakub Staroń, 2017
+
 module Main where
 
 import Control.Monad
