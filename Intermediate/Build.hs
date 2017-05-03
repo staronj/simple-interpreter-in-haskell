@@ -199,7 +199,10 @@ fromStmt env stmt suffix =
       expr <- fromExpr env expr
       return $ fromWhateverExpr Sequence expr compiledSuffix
     AST.StrictStmt expr                         -> undefined
-    AST.Loop block                              -> undefined
+    AST.Loop block                              -> do
+      block <- fromBlock env block
+      let loop = Loop Forever block
+      return $ Sequence loop compiledSuffix
     AST.While expr block                        -> do
       expr <- fromExpr env expr
       block <- fromBlock env block
@@ -213,8 +216,10 @@ fromStmt env stmt suffix =
       block <- fromBlock env block
       let loop = Loop (ForRange ident expr1 expr2) block
       return $ Sequence loop compiledSuffix
-    AST.Break                                   -> undefined
-    AST.Continue                                -> undefined
+    AST.Break                                   ->
+      return $ Sequence (FlowControl Break) compiledSuffix
+    AST.Continue                                ->
+      return $ Sequence (FlowControl Continue) compiledSuffix
     AST.LetStmt pattern valueType expr'          -> do
       expr' <- fromExpr env expr'
       expr' <- return $ buildRValueExpr expr'

@@ -426,7 +426,7 @@ compileExpr env offset expr state =
           let loop = loopIteration >=> ifConditionThenCall loop in do
             state <- (conditionCheck >=> ifConditionThenCall loop) state
             return (state, stackPointer)
-        _ -> undefined
+        _ -> error "Not implented."
     Imd.FlowControl   _         -> undefined
     Imd.BindVariables bindings initExpr suffixExpr ->
       -- Run initExpr on offset = (offset + sizeOf initExpr), copy

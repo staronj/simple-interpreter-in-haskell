@@ -238,12 +238,14 @@ typeCheckStmt stmt env = case stmt of
         assertTypesEqual env exprType AST.unit
         return env
     AST.Loop block                              -> do
-        blockType <- typeCheckBlock block env
+        let env' = env { inLoop = True }
+        blockType <- typeCheckBlock block env'
         assertTypesEqual env blockType AST.unit
         return env
     AST.While expr block                        -> do
         exprType <- varType <$> typeCheckExpr expr env
-        blockType <- typeCheckBlock block env
+        let env' = env { inLoop = True }
+        blockType <- typeCheckBlock block env'
         assertTypesEqual env exprType AST.Bool
         assertTypesEqual env blockType AST.unit
         return env
@@ -252,14 +254,16 @@ typeCheckStmt stmt env = case stmt of
         assertIsArray env exprType
         let AST.Array valueType _ = exprType
         let env' = insertVariable ident Variable { varType = valueType, mutable = False } env
-        blockType <- typeCheckBlock block env'
+        let env'' = env' { inLoop = True }
+        blockType <- typeCheckBlock block env''
         assertTypesEqual env blockType AST.unit
         return env
     AST.RangeForLoop ident expr1 expr2 block    -> do
         exprType1 <- varType <$> typeCheckExpr expr1 env
         exprType2 <- varType <$> typeCheckExpr expr2 env
         let env' = insertVariable ident Variable { varType = AST.I32, mutable = False } env
-        blockType <- typeCheckBlock block env'
+        let env'' = env' { inLoop = True }
+        blockType <- typeCheckBlock block env''
         assertTypesEqual env exprType1 AST.I32
         assertTypesEqual env exprType2 AST.I32
         assertTypesEqual env blockType AST.unit
