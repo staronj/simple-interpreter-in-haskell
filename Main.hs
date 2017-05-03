@@ -2,21 +2,19 @@
 
 module Main where
 
-import Data.Int
+import Data.Maybe (fromMaybe)
 import Control.Monad
-import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Maybe (runMaybeT)
 import Control.Monad.Except
-import Data.Tree
 
 import qualified System.Console.GetOpt as Opt
 import System.Environment (getArgs)
 
-import qualified AST
 import qualified AST.Print as AST
-import FormatString
-import TypeCheck
-import Compile
-import qualified Intermediate
+import qualified AST.Build as AST
+import FormatString (format)
+import TypeCheck (typeCheck)
+import Compile (compile, execute)
 import qualified Intermediate.Build as Intermediate
 
 
@@ -25,6 +23,7 @@ data Options = Options
  , optDumpAst        :: Bool
  } deriving Show
 
+defaultOptions :: Options
 defaultOptions    = Options
  { optVerbose     = False
  , optDumpAst     = False
@@ -72,26 +71,26 @@ compilerOpts argv =
   where header = "Usage: interpret [OPTIONS...] file"
 
 main :: IO ()
-main = liftM (maybe () id) . runMaybeT $ do
-  args <- liftIO $ getArgs
+main = fmap (fromMaybe ()) $ runMaybeT $ do
+  args <- liftIO getArgs
   (options, filePath) <-  liftIO $ compilerOpts args
   when (optVerbose options) $ liftIO $ putStrLn $ format "Reading file %0." [filePath]
   file <-  liftIO $ readFile filePath
   when (optVerbose options) $ liftIO $ putStrLn "Building AST."
   let ast = AST.buildAST file
   ast <- case ast of
-    Right ast -> (when (optDumpAst options) $ (liftIO $ putStrLn $ AST.prettyPrint ast) >> mzero) >> return ast
-    Left err -> (liftIO $ putStrLn err) >> mzero
+    Right ast -> when (optDumpAst options) (liftIO (putStrLn $ AST.prettyPrint ast) >> mzero) >> return ast
+    Left err -> liftIO (putStrLn err) >> mzero
   when (optVerbose options) $ liftIO $ putStrLn "Type checking."
   ast <- case typeCheck ast of
     Right ast -> return ast
-    Left err -> (liftIO $ putStrLn err) >> mzero
+    Left err -> liftIO (putStrLn err) >> mzero
   when (optVerbose options) $ liftIO $ putStrLn "Compiling into lambda."
   let intermediate = Intermediate.fromAST ast
   let program = compile intermediate
-  input <- liftIO $ getContents >>= (return.(map read).lines)
+  input <- liftIO $ fmap (map read . lines) getContents
   when (optVerbose options) $ liftIO $ putStrLn "Executing."
   let output = execute program input
   case output of
     Right output -> liftIO $ mapM_ print output
-    Left (err, output) -> liftIO $ (mapM_ print output) >> (print err)
+    Left (err, output) -> liftIO $ mapM_ print output >> print err
