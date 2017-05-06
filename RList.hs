@@ -1,6 +1,6 @@
 -- Jakub Staroń, 2017
 
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module RList where
 
@@ -12,11 +12,7 @@ import FormatString (format)
 data RList a =
     Nil
   | (RList a) :> a
-  deriving (Eq)
-
-instance Functor RList where
-    fmap f (xs :> x) = fmap f xs :> f x
-    fmap _ Nil = Nil
+  deriving (Eq, Functor)
 
 instance Monoid (RList a) where
     mempty = Nil
@@ -31,6 +27,5 @@ instance Foldable RList where
    foldr f acc (xs :> x) = acc `seq` foldr f (f x acc) xs
 
 instance (Show a) => Show (RList a) where
-    show list = case list of
-        Nil -> "[]"
-        cons -> format "[%0]" [intercalate ", " (toList (fmap show cons))]
+    show Nil = "[]"
+    show cons = format "[%0]" [intercalate ", " $ toList $ fmap show cons]

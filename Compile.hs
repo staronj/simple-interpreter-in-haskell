@@ -91,22 +91,21 @@ readMemory address state =
     (MapStrict.lookup address m)
 
 writeMemory :: MemoryAddress -> Int32 -> State -> State
-writeMemory address value state | trace (format "writeMemory '%0' '%1'" [show address, show value]) False = undefined
+writeMemory address value _ | trace (format "writeMemory '%0' '%1'" [show address, show value]) False = undefined
 writeMemory address value state =
   state { memory = m' } where
     Memory m = memory state
     m' = Memory $ MapStrict.insert address value m
 
 sizeOf ::  AST.Type -> MemoryOffset
-sizeOf valueType = MemoryOffset $ sizeOf_ valueType where
+sizeOf = MemoryOffset . sizeOf_ where
   sizeOf_ ::  AST.Type -> Int32
-  sizeOf_ valueType = case valueType of
-    AST.Tuple types             -> sum $ map sizeOf_ types
-    AST.Array valueType count   -> sizeOf_ valueType * count
-    _                           -> 1
+  sizeOf_ (AST.Tuple types)           = sum $ map sizeOf_ types
+  sizeOf_ (AST.Array valueType count) = sizeOf_ valueType * count
+  sizeOf_ _                           = 1
 
 copyMemory :: MemoryOffset -> MemoryAddress -> MemoryAddress -> State -> State
-copyMemory size from to state | trace (format "copyMemory '%0' '%1' '%2'" [show size, show from, show to]) False = undefined
+copyMemory size from to _ | trace (format "copyMemory '%0' '%1' '%2'" [show size, show from, show to]) False = undefined
 copyMemory size from to state =
   assert ( ((from |+ size) <= to) || ((to |+ size) <= from) )
   foldl' (flip ($)) state $ zipWith cellCopy (range from $ from |+ size) (range to $ to |+ size) where
@@ -461,69 +460,7 @@ offsetInTuple (AST.Tuple types) (n : ns) =
   let sizes = map sizeOf types in
   let nn = fromIntegral n in
   sum (take nn sizes) + offsetInTuple (types !! nn) ns
-
-
-{-
-compileFunction :: AST.FunctionDeclaration -> FEnv -> Function
-compileFunction function fenv =
-    let venv = initialVEnv in
-    let resultType = AST.resultType function in
-    let parameters = map AST.valueType (AST.parameters function) in
-    let cont = do
-        (valueType, cont) <- compileBlock (AST.body function) (Env fenv venv)
-        unless (valueType == resultType) $ Left $ format "Function \"%0\": could not match type \"%1\" with result type \"%2\"." [AST.name function, show valueType, show resultType]
-        return cont in
-    Function cont parameters resultType
-
-compileBlock :: AST.Block -> Env -> Either String (AST.Type, Continuation)
-compileBlock (AST.Block stmts expr) env =
-    let functionDeclarations = [funDecl | AST.FunDeclStmt funDecl <- stmts] in
-    let fenv = insertFunctions functionDeclarations (functions env) in
-    let env' = env {functions = fenv} in
-    do
-        (env'', offset, cont1) <- compileStmtSequence stmts env'
-        (valueType, cont2) <- compileExpr expr env''
-        let cont memoryAddress state = do
-            state <- cont1 memoryAddress state
-            cont2 (memoryAddress + offset) state
-        return (valueType, cont)
-
-compileStmtSequence :: [AST.Stmt] -> Env -> Either String (Env, Int32, Continuation)
-compileStmtSequence [] env = Right (env, 0, identityContinuation)
-compileStmtSequence (stmt : stmts) env = do
-    (env', offset, cont1) <- compileStmt stmt env
-    (env'', offset', cont2) <- compileStmtSequence stmts env'
-    let cont memoryAddress state = do
-            state <- cont1 memoryAddress state
-            cont2 (memoryAddress + offset) state
-    return (env'', offset + offset', cont)
-
-compileStmt :: AST.Stmt -> Env -> Either String (Env, Int32, Continuation)
-compileStmt stmt env = case stmt of
-    AST.FunDeclStmt _       -> return (env, 0, identityContinuation)
-    AST.Stmt expr           -> do
-        (valueType, expr) <- compileExpr expr env
-        return (env, 0, expr)
-    _                       -> error "Not implemented."
-
-compileExpr :: AST.Expr -> Env -> Either String (AST.Type, Continuation)
-compileExpr expr env = case expr of
-    AST.LiteralExpr literal         -> do
-        case literal of
-            AST.LiteralI32 n    -> return (AST.I32, \address -> liftMemory $ writeMemory address n)
-            AST.LiteralBool b   -> undefined
-    AST.FunctionCall ident exprs   -> do
-        function <- findFunction ident (functions env)
-        exprs <- mapM (flip compileExpr env) exprs
-        assertFunctionArguments function ident $ map fst exprs
-        let (Right fun_cont) = body function
-        let cont memoryAddress state = do
-            state <- (snd $ head exprs) memoryAddress state
-            fun_cont memoryAddress state
-        return (resultType function, cont)
-    AST.TupleConstruct exprs        -> return (AST.unit, identityContinuation)
-    _                               -> error "Not implemented."
--}
+offsetInTuple _ _ = undefined
 
 execute :: Program -> Input -> Either (String, Output) Output
 execute program input =

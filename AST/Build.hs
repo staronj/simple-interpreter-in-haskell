@@ -112,17 +112,17 @@ buildStmt stmt = case stmt of
 
 buildLiteral :: Abs.Literal -> Literal
 buildLiteral literal = case literal of
-  Abs.LiteralI32 n                  -> LiteralI32 (fromIntegral n)
-  Abs.LiteralBool (Abs.Boolean b)   -> LiteralBool (b == "true")
+  Abs.LiteralI32 n                  -> LiteralI32 $ fromIntegral n
+  Abs.LiteralBool (Abs.Boolean b)   -> LiteralBool $ b == "true"
   Abs.LiteralIdent (Abs.Ident name) -> error "Not implemented."
 
 
 buildPattern :: Abs.Pattern -> Pattern
 buildPattern pattern = case pattern of
-  Abs.PatternVariable (Abs.Ident name)         -> PatternVariable name
-  Abs.PatternMutableVariable (Abs.Ident name)  -> PatternMutableVariable name
-  Abs.PatternIgnore                             -> PatternIgnore
-  Abs.PatternTuple patterns                     -> PatternTuple $ map buildPattern (buildList patterns)
+  Abs.PatternVariable (Abs.Ident name)        -> PatternVariable name
+  Abs.PatternMutableVariable (Abs.Ident name) -> PatternMutableVariable name
+  Abs.PatternIgnore                           -> PatternIgnore
+  Abs.PatternTuple patterns                   -> PatternTuple $ map buildPattern (buildList patterns)
   where
     buildList :: Abs.MarkPatternList -> [Abs.Pattern]
     buildList patterns = case patterns of
@@ -137,8 +137,8 @@ buildType :: Abs.Type -> Type
 buildType type' = case type' of
   Abs.Bool                    -> Bool
   Abs.I32                     -> I32
-  Abs.Reference type''        -> Reference (buildType type'')
-  Abs.MutableReference type'' -> MutableReference (buildType type'')
+  Abs.Reference type''        -> Reference $ buildType type''
+  Abs.MutableReference type'' -> MutableReference $ buildType type''
   Abs.Array type'' n          -> Array (buildType type'') (fromIntegral n)
   Abs.Tuple types             -> Tuple $ map buildType $ buildList types
   where
