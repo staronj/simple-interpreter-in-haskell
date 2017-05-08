@@ -1,8 +1,8 @@
 // Jakub Staroń, 2017
 
 fn main() {
-	let a = readI32();
-	let b = if a == 42 {
-		24
-	};
+  let a = readI32();
+  let b = if a == 42 {
+    24
+  };
 }

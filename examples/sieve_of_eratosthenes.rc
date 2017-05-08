@@ -1,29 +1,29 @@
 // Jakub Staroń, 2017
 
 fn sieve() -> [bool; 100000] {
-	let mut tab = [true; 100000];
-	let N = 100000;
-	tab[0] = false;
-	tab[1] = false;
-	let mut x = 2;
-	while x * x < N {
-		if tab[x] {
-			let mut y = x * x;
-			while y < N {
-				tab[y] = false;
-				y = y + x;
-			}
-		}
-		x = x + 1;
-	}
-	tab
+  let mut tab = [true; 100000];
+  let N = 100000;
+  tab[0] = false;
+  tab[1] = false;
+  let mut x = 2;
+  while x * x < N {
+    if tab[x] {
+      let mut y = x * x;
+      while y < N {
+        tab[y] = false;
+        y = y + x;
+      }
+    }
+    x = x + 1;
+  }
+  tab
 }
 
 fn main() {
-	let primes = sieve();
-	for i in 2..100000 {
-		if primes[i] {
-			writeI32(i);
-		}
-	}
+  let primes = sieve();
+  for i in 2..100000 {
+    if primes[i] {
+      writeI32(i);
+    }
+  }
 }

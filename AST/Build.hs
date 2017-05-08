@@ -114,7 +114,6 @@ buildLiteral :: Abs.Literal -> Literal
 buildLiteral literal = case literal of
   Abs.LiteralI32 n                  -> LiteralI32 $ fromIntegral n
   Abs.LiteralBool (Abs.Boolean b)   -> LiteralBool $ b == "true"
-  Abs.LiteralIdent (Abs.Ident name) -> error "Not implemented."
 
 
 buildPattern :: Abs.Pattern -> Pattern

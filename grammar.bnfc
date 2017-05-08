@@ -6,144 +6,145 @@ comment "//";
 token Boolean {"true"} | {"false"} ;
 
 -- Literals
-LiteralBool. Literal					::= Boolean ;
-LiteralI32. Literal						::= Integer ;
-LiteralIdent. Literal					::= Ident ;
+LiteralBool. Literal               ::= Boolean ;
+LiteralI32. Literal                ::= Integer ;
 
 -- Exprressions
-Assign. Expr						      ::= Expr1 "=" Expr ; -- Expression, but its type is always ()
+Assign. Expr                       ::= Expr1 "=" Expr ; -- Expression, but its type is always ()
 
-Or. Expr1                     ::= Expr2  "||" Expr3 ;
-And. Expr2                    ::= Expr3  "&&" Expr4 ;
+Or. Expr1                          ::= Expr2  "||" Expr3 ;
+And. Expr2                         ::= Expr3  "&&" Expr4 ;
 
-Equal. Expr4  				        ::= Expr5  "==" Expr6 ;
-NotEqual. Expr4 				      ::= Expr5  "!=" Expr6 ;
-Less. Expr4  							    ::= Expr5  "<" Expr6 ;
-
-
-Add. Expr6 				            ::= Expr6  "+" Expr7 ;
-Subtract. Expr6 						  ::= Expr6  "-" Expr7 ;
+Equal. Expr4                       ::= Expr5  "==" Expr6 ;
+NotEqual. Expr4                    ::= Expr5  "!=" Expr6 ;
+Less. Expr4                        ::= Expr5  "<" Expr6 ;
 
 
-Multiply. Expr7 						  ::= Expr7 "*" Expr8 ;
-Divide. Expr7 		            ::= Expr7 "/" Expr8 ;
-Modulo. Expr7                 ::= Expr7 "%" Expr8 ;
+Add. Expr6                         ::= Expr6  "+" Expr7 ;
+Subtract. Expr6                    ::= Expr6  "-" Expr7 ;
 
-Negate. Expr9							    ::= "-" Expr9 ;
-Dereference. Expr9						::= "*" Expr9 ;
-Not. Expr9								    ::= "!" Expr9 ;
-Borrow. Expr9							    ::= "&" Expr9 ;
-MutableBorrow. Expr9					::= "&" "mut" Expr9 ;
 
-LiteralExpr. Expr10 					::= Literal ;
-ExprIdent. Expr10 						::= Ident ;
+Multiply. Expr7                    ::= Expr7 "*" Expr8 ;
+Divide. Expr7                      ::= Expr7 "/" Expr8 ;
+Modulo. Expr7                      ::= Expr7 "%" Expr8 ;
 
-FunctionCall. Expr10 					::= Ident "(" SepExprList ")";
-ArrayLookup. Expr10 					::= Expr10 "[" Expr "]" ;
-TupleLookup. Expr10						::= Expr10 "." Integer ;
-IfElseExpr. Expr10						::= IfElse ;
-BlockExpr. Expr10						  ::= Block ;
+Negate. Expr9                      ::= "-" Expr9 ;
+Dereference. Expr9                 ::= "*" Expr9 ;
+Not. Expr9                         ::= "!" Expr9 ;
+Borrow. Expr9                      ::= "&" Expr9 ;
+MutableBorrow. Expr9               ::= "&" "mut" Expr9 ;
+
+-- Expr 11 - constants and identifiers
+-- Can be used in types and reanges definitions
+LiteralExpr. Expr11                ::= Literal ;
+ExprIdent. Expr11                  ::= Ident ;
+
+FunctionCall. Expr10               ::= Ident "(" SepExprList ")";
+ArrayLookup. Expr10                ::= Expr10 "[" Expr "]" ;
+TupleLookup. Expr10                ::= Expr10 "." Integer ;
+IfElseExpr. Expr10                 ::= IfElse ;
+BlockExpr. Expr10                  ::= Block ;
 
 
 -- Z powodu ograniczeń BNFC musimy definiować własną listę by poprawnie zaimplementować parsowanie przecinka. Nie będzie to jedyne takie miejsce.
 -- Rozróżniamy dwa typy "list" w naszej składni:
--- comma_marked(pattern) = ε | [ pattern ',' ] | [ [ pattern ',' ]+ pattern ] 	- prefix Mark*
--- comma_separated(pattern) = ε | [ [ pattern ',' ]* pattern ]					- prefix Sep*
+-- comma_marked(pattern) = ε | [ pattern ',' ] | [ [ pattern ',' ]+ pattern ]   - prefix Mark*
+-- comma_separated(pattern) = ε | [ [ pattern ',' ]* pattern ]          - prefix Sep*
 -- W bnfc nie da się wyrazić powyższych gramatyk w sposób zwarty.
 
 -- Beware, list idiom
-SepExprNil. SepExprList					::= ;
-SepExprOne.  SepExprList				::= Expr ;
-SepExprMore. SepExprList				::= Expr "," SepExprList1 ;
-SepExprHead. SepExprList1				::= Expr ;
-SepExprTail. SepExprList1				::= SepExprList1 "," Expr ;
+SepExprNil. SepExprList            ::= ;
+SepExprOne.  SepExprList           ::= Expr ;
+SepExprMore. SepExprList           ::= Expr "," SepExprList1 ;
+SepExprHead. SepExprList1          ::= Expr ;
+SepExprTail. SepExprList1          ::= SepExprList1 "," Expr ;
 
 
 -- Array and tuple constructors
 
-ArrayElements. Expr10					  ::= "[" MarkExprList "]" ;
-ArrayRepeat. Expr10						  ::= "[" Expr ";" Integer "]" ;
-ArrayRange. Expr10						  ::= "[" Integer ".." Integer "]" ;
+ArrayElements. Expr10              ::= "[" MarkExprList "]" ;
+ArrayRepeat. Expr10                ::= "[" Expr ";" Integer "]" ;
+ArrayRange. Expr10                 ::= "[" Integer ".." Integer "]" ;
 
-TupleConstruct. Expr10					::= "(" MarkExprList ")" ;
+TupleConstruct. Expr10             ::= "(" MarkExprList ")" ;
 
-coercions Expr 10 ;
+coercions Expr 11 ;
 
 
 -- Beware, list idiom
-MarkExprNil. MarkExprList				  ::= ;
-MarkExprOne.  MarkExprList				::= Expr "," ;
-MarkExprMore. MarkExprList				::= Expr "," MarkExprList1 ;
-MarkExprHead. MarkExprList1				::= Expr ;
-MarkExprTail. MarkExprList1				::= MarkExprList1 "," Expr ;
+MarkExprNil. MarkExprList          ::= ;
+MarkExprOne.  MarkExprList         ::= Expr "," ;
+MarkExprMore. MarkExprList         ::= Expr "," MarkExprList1 ;
+MarkExprHead. MarkExprList1        ::= Expr ;
+MarkExprTail. MarkExprList1        ::= MarkExprList1 "," Expr ;
 
 
 -- Types
-Bool. Type								        ::= "bool" ;
-I32. Type								          ::= "i32" ;
-Reference. Type							      ::= "&" Type ;
-MutableReference. Type					  ::= "&" "mut" Type ;
-Array. Type								        ::= "[" Type ";" Integer "]" ;
-Tuple. Type								        ::= "(" MarkTypeList ")" ;
+Bool. Type                         ::= "bool" ;
+I32. Type                          ::= "i32" ;
+Reference. Type                    ::= "&" Type ;
+MutableReference. Type             ::= "&" "mut" Type ;
+Array. Type                        ::= "[" Type ";" Integer "]" ;
+Tuple. Type                        ::= "(" MarkTypeList ")" ;
 
 -- Beware, list idiom
-MarkTNil. MarkTypeList					  ::= ;
-MarkTOne.  MarkTypeList					  ::= Type "," ;
-MarkTMore. MarkTypeList					  ::= Type "," MarkTypeList1 ;
-MarkTHead. MarkTypeList1				  ::= Type ;
-MarkTTail. MarkTypeList1				  ::= MarkTypeList1 "," Type ;
+MarkTNil. MarkTypeList             ::= ;
+MarkTOne.  MarkTypeList            ::= Type "," ;
+MarkTMore. MarkTypeList            ::= Type "," MarkTypeList1 ;
+MarkTHead. MarkTypeList1           ::= Type ;
+MarkTTail. MarkTypeList1           ::= MarkTypeList1 "," Type ;
 
 
 -- Pattern
-PatternVariable. Pattern				  ::= Ident ;
-PatternMutableVariable. Pattern		::= "mut" Ident ;
-PatternIgnore. Pattern 					  ::= "_" ;
-PatternTuple. Pattern 					  ::= "(" MarkPatternList ")" ;
+PatternVariable. Pattern           ::= Ident ;
+PatternMutableVariable. Pattern    ::= "mut" Ident ;
+PatternIgnore. Pattern             ::= "_" ;
+PatternTuple. Pattern              ::= "(" MarkPatternList ")" ;
 
 -- Beware, list idiom
-MarkPatternNil. MarkPatternList			::= ;
-MarkPatternOne.  MarkPatternList		::= Pattern "," ;
-MarkPatternMore. MarkPatternList		::= Pattern "," MarkPatternList1 ;
-MarkPatternHead. MarkPatternList1		::= Pattern ;
-MarkPatternTail. MarkPatternList1		::= MarkPatternList1 "," Pattern ;
+MarkPatternNil. MarkPatternList    ::= ;
+MarkPatternOne.  MarkPatternList   ::= Pattern "," ;
+MarkPatternMore. MarkPatternList   ::= Pattern "," MarkPatternList1 ;
+MarkPatternHead. MarkPatternList1  ::= Pattern ;
+MarkPatternTail. MarkPatternList1  ::= MarkPatternList1 "," Pattern ;
 
 
 -- Function declaration
-FunDecl. FunDecl						        ::= "fn" Ident "(" SepParameterList ")" Block ;
-FunDeclType. FunDecl					      ::= "fn" Ident "(" SepParameterList ")" "->" Type Block;
+FunDecl. FunDecl                   ::= "fn" Ident "(" SepParameterList ")" Block ;
+FunDeclType. FunDecl               ::= "fn" Ident "(" SepParameterList ")" "->" Type Block;
 
-Parameter. Parameter					      ::= Pattern ":" Type ;
+Parameter. Parameter               ::= Pattern ":" Type ;
 -- Beware, list idiom
-SepPNil. SepParameterList				    ::= ;
-SepPOne.  SepParameterList				  ::= Parameter ;
-SepPMore. SepParameterList				  ::= Parameter "," SepParameterList1 ;
-SepPHead. SepParameterList1				  ::= Parameter ;
-SepPTail. SepParameterList1				  ::= SepParameterList1 "," Parameter ;
+SepPNil. SepParameterList          ::= ;
+SepPOne.  SepParameterList         ::= Parameter ;
+SepPMore. SepParameterList         ::= Parameter "," SepParameterList1 ;
+SepPHead. SepParameterList1        ::= Parameter ;
+SepPTail. SepParameterList1        ::= SepParameterList1 "," Parameter ;
 
 -- If
-IfElse. IfElse 							        ::= "if" Expr Block "else" Block ;
-IfStmt. IfStmt 							        ::= "if" Expr Block ;
+IfElse. IfElse                     ::= "if" Expr Block "else" Block ;
+IfStmt. IfStmt                     ::= "if" Expr Block ;
 
 -- Stmt
-FunDeclStmt. Stmt						        ::= FunDecl;
-Stmt. Stmt								          ::= Expr ";";
-Break. Stmt								          ::= "break" ";";
-Continue. Stmt							        ::= "continue" ";";
-If. Stmt								            ::= IfStmt ;
-IfElseStmt. Stmt						        ::= IfElse ;
-Loop. Stmt 								          ::= "loop" Block ;
-While. Stmt 							          ::= "while" Expr Block ;
-IterableForLoop. Stmt 					    ::= "for" Ident "in" Expr Block ;
-RangeForLoop. Stmt						      ::= "for" Ident "in" Expr ".." Expr Block ;
-LetStmtStrict. Stmt						      ::= "let" Pattern ":" Type "=" Expr ";" ;
-LetStmt. Stmt							          ::= "let" Pattern "=" Expr ";" ;
-BlockStmt. Stmt							        ::= Block ;
+FunDeclStmt. Stmt                  ::= FunDecl;
+Stmt. Stmt                         ::= Expr ";";
+Break. Stmt                        ::= "break" ";";
+Continue. Stmt                     ::= "continue" ";";
+If. Stmt                           ::= IfStmt ;
+IfElseStmt. Stmt                   ::= IfElse ;
+Loop. Stmt                         ::= "loop" Block ;
+While. Stmt                        ::= "while" Expr Block ;
+IterableForLoop. Stmt              ::= "for" Ident "in" Expr Block ;
+RangeForLoop. Stmt                 ::= "for" Ident "in" Expr ".." Expr Block ;
+LetStmtStrict. Stmt                ::= "let" Pattern ":" Type "=" Expr ";" ;
+LetStmt. Stmt                      ::= "let" Pattern "=" Expr ";" ;
+BlockStmt. Stmt                    ::= Block ;
 
 -- Block
-Block. Block							          ::= "{" [Stmt] "}" ;
-BlockWithValue. Block					      ::= "{" [Stmt] Expr"}" ;
+Block. Block                       ::= "{" [Stmt] "}" ;
+BlockWithValue. Block              ::= "{" [Stmt] Expr"}" ;
 separator Stmt "";
 
 -- Program
-Program. Program						        ::= [FunDecl] ;
+Program. Program                   ::= [FunDecl] ;
 separator FunDecl "";

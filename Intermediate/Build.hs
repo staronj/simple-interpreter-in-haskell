@@ -165,8 +165,9 @@ instance ToHeteromorphic (Expr 'RValue) where
 
 fromBlock :: Env -> AST.Block -> IntermediateBuilder (Expr 'RValue)
 fromBlock env block@(AST.Block stmts expr) =
-  let functions = AST.getFunctionsFromBlock block in
-  fromBlockSuffix env stmts expr
+  let functions = AST.getFunctionsFromBlock block in do
+    env' <- insertFunctions env functions
+    fromBlockSuffix env' stmts expr
 
 fromBlockSuffix :: Env -> [AST.Stmt] -> AST.Expr -> IntermediateBuilder (Expr 'RValue)
 fromBlockSuffix env stmts expr = case uncons stmts of
@@ -265,7 +266,9 @@ fromExpr env expr = case expr of
     exprs <- mapM (fromExpr env) exprs
     exprs <- return $ map buildRValueExpr exprs
     return $ toHeteromorphic $ Tuple exprs
-  AST.BlockExpr       block               -> undefined
+  AST.BlockExpr       block               -> do
+    block <- fromBlock env block
+    return $ toHeteromorphic block
   AST.IfElse          condExpr trueBlock falseBlock -> do
     condExpr <- fromExpr env condExpr
     trueBlock <- fromBlock env trueBlock
