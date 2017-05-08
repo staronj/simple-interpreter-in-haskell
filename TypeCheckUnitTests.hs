@@ -3,11 +3,11 @@
 module Main where
 
 import Control.Monad
-import Data.Either
+import Data.Either (isLeft)
 
-import FormatString
-import AST
-import TypeCheck
+import FormatString (format)
+import AST.Build (buildAST)
+import TypeCheck (typeCheck)
 
 left :: Either a b -> a
 left e = case e of
@@ -20,13 +20,13 @@ right e = case e of
   Right b -> b
 
 test :: Bool -> String -> String -> IO ()
-test shouldTypeCheck message code = do
-  let ast = AST.buildAST code
-  when (isLeft ast) $ fail $ format "Test \"%0\" failed to parse, error is\n%1" [message, left ast]
+test shouldTypeCheck testName code = do
+  let ast = buildAST code
+  when (isLeft ast) $ fail $ format "Test '%0' failed to parse. The error is\n%1" [testName, left ast]
   let typeChecked = typeCheck $ right ast
   case typeChecked of
-    Left err -> when shouldTypeCheck $ fail $ format "Test \"%0\" should type-check but it don't. Error is \"%1\"." [message, err]
-    Right _ -> unless shouldTypeCheck $ fail $ format "Test \"%0\" should not type-check but it does." [message]
+    Left err -> when shouldTypeCheck $ fail $ format "Test '%0' should type-check but it don't. The error is '%1'." [testName, err]
+    Right _ -> unless shouldTypeCheck $ fail $ format "Test '%0' should not type-check but it does." [testName]
 
 tests :: [IO()]
 
@@ -55,6 +55,30 @@ tests =
 
   test False "function-not-declared"
     "fn main() { foo(); }",
+
+  test True "function-call-correct-type"
+    "fn foo() -> i32 { 42 } fn main() { let a : i32 = foo(); }",
+
+  test False "function-call-wrong-type"
+    "fn foo() -> i32 { 42 } fn main() { let a : bool = foo(); }",
+
+  test True "function-shadowing"
+    "fn foo() -> i32 { 42 } fn main() { fn foo() -> bool { true } let a : bool = foo(); }",
+
+  test True "recurrent-function"
+    "fn foo() -> i32 { let a : i32 = foo(); a } fn main() { let b = foo(); }",
+
+  test True "function-arguments-minimal-example"
+    "fn foo(a : i32) { } fn main() { foo(42) }",
+
+  test False "function-wrong-type-of-argument"
+    "fn foo(a : i32) { } fn main() { foo(true) }",
+
+  test False "function-wrong-number-of-arguments"
+    "fn foo(a : i32) { } fn main() { foo(1, 2) }",
+
+  test False "function-duplicated-name"
+    "fn foo() { } fn foo() { } fn main() { }",
 
   test False "if-wrong-block-type"
     "fn main() { if true { 42 } }",
@@ -104,6 +128,18 @@ tests =
   test False "let-match-inconsistent-tuple-sizes"
     "fn main() { let (a, b) = (1, 2, 3); }",
 
+  test False "let-duplicated-binding-name"
+    "fn main() { let (a, a) = (1, 1); }",
+
+  test False "let-duplicated-binding-name-in-function-argument"
+    "fn foo(a : i32, a : i32) { } fn main() { }",
+
+  test True "function-parameter-tuple-type"
+    "fn foo((a, b) : (i32, i32)) { } fn main() { }",
+
+  test False "let-duplicated-binding-name-in-function-argument-ex"
+    "fn foo((a, a) : (i32, i32)) { } fn main() { }",
+
   test True "or-minimal-example"
     "fn main() { true || false; }",
 
@@ -146,7 +182,7 @@ tests =
   test False "use-undeclared-variable"
     "fn main() { let a = 42; b + 1; }",
 
-  test True "names-shadowing"
+  test True "variables-shadowing"
     "fn main() { let a = 42; { let a = true; a || false; } a + 1; }",
 
   test True "assign-minimal-example"

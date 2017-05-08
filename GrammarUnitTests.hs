@@ -2,28 +2,25 @@
 
 module Main where
 
-import LexGrammar
+import FormatString (format)
+import LexGrammar (Token)
 import ParGrammar
-import SkelGrammar
-import PrintGrammar
-import AbsGrammar
-
-import ErrM
+import ErrM (Err(..))
 
 type ParseFun a = [Token] -> Err a
 
-
-valid :: (Print a, Show a) => ParseFun a -> String -> IO ()
+valid :: Show a => ParseFun a -> String -> IO ()
 valid parse str = let tokens = myLexer str in case parse tokens of
-           Bad msg  -> do putStrLn $ "ERROR expected valid, is invalid  for \"" ++ str ++ "\""
-           Ok  tree -> do return () -- putStrLn $ "OK                                for \"" ++ str ++ "\"" -- ++ ", tree: \t\t\t" ++  show tree
+  Bad msg  -> putStrLn $ format "ERROR expected valid, is invalid.\nTest: '%0.\nMessage: %1" [str, msg]
+  Ok  _    -> return ()
 
-invalid :: (Print a, Show a) => ParseFun a -> String -> IO ()
+invalid :: Show a => ParseFun a -> String -> IO ()
 invalid parse str = let tokens = myLexer str in case parse tokens of
-           Bad mgs  -> do return () -- putStrLn $ "OK                                for \"" ++ str ++ "\""
-           Ok  tree -> do putStrLn $ "ERROR expected invalid, is valid  for \"" ++ str ++ "\"" -- ++ ", tree: \t\t\t" ++  show tree
+  Bad _    -> return ()
+  Ok  _    -> putStrLn $ format "ERROR expected invalid, is valid.\nTest: '%0'." [str]
 
-test =
+tests :: [IO ()]
+tests =
   [
     valid pExpr         "1",
     valid pExpr         "(1)",
@@ -137,7 +134,6 @@ test =
     invalid pParameter  " : i32",
     invalid pParameter  "n : 1",
 
-
     valid pFunDecl      "fn foo() { }",
     valid pFunDecl      "fn foo() -> i32 { }",
     valid pFunDecl      "fn foo()->i32 { }",
@@ -212,4 +208,4 @@ test =
   ]
 
 main :: IO ()
-main = sequence_ test
+main = sequence_ tests

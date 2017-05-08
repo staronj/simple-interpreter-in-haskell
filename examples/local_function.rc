@@ -1,0 +1,17 @@
+// Jakub Staroń, 2017
+
+fn main() {
+  let n = {
+    let m = readI32();
+    fn sum_input(count: i32) -> i32 {
+        if 0 < count {
+          readI32() + sum_input(count - 1)
+        }
+        else {
+          0
+        }
+    }
+    sum_input(m)
+  };
+  writeI32(n)
+}

@@ -88,6 +88,9 @@ mainFunctionMustReturnUnitMessage = "'main' function must return '()' type"
 duplicatedFunctionIdentifierInScopeMessage :: AST.Ident -> Env -> String
 duplicatedFunctionIdentifierInScopeMessage name env =  format "duplicated definitions of function '%0' at\n%1" [name, show $ path env]
 
+duplicatedBindingNameInPatternMessage :: AST.Ident -> Env -> String
+duplicatedBindingNameInPatternMessage name env =  format "duplicated name '%0' in pattern at\n%1" [name, show $ path env]
+
 outOfBoundsTupleLookupMessage :: (Num a, Show a) => AST.Type -> a -> Env -> String
 outOfBoundsTupleLookupMessage valueType n env = format "attempted out-of-bounds tuple index `%0` on type `%1` at\n%2" [show n, show valueType, show $ path env]
 
@@ -121,19 +124,31 @@ markInLoop :: Env -> Env
 markInLoop env = env { inLoop = True }
 
 insertPattern :: AST.Pattern -> AST.Type -> Env -> Either String Env
-insertPattern pattern valueType env = case pattern of
-  AST.PatternVariable name            -> return $ insertVariable name (Variable valueType False) env
-  AST.PatternMutableVariable name     -> return $ insertVariable name (Variable valueType True) env
-  AST.PatternIgnore                   -> return env
-  AST.PatternTuple pattern'           -> case valueType of
-    AST.Tuple types ->
-      let patternLength = length pattern' in
-      let typesLength = length types in
-      do
-        unless (patternLength == typesLength) $ throwError $ tupleLengthNotMatchMessage typesLength patternLength env
-        let pairs = zipWith insertPattern pattern' types
-        foldl' (>=>) return pairs env
-    _ -> throwError $ couldNotMatchTypeWithTupleMessage valueType env
+insertPattern pattern valueType env = do
+  let duplicateName = findDuplicate $ namesInPattern pattern
+  maybe (return ()) (throwError . flip duplicatedBindingNameInPatternMessage env) duplicateName
+  insertPattern' pattern valueType env
+  where
+  namesInPattern :: AST.Pattern -> [AST.Ident]
+  namesInPattern pattern = case pattern of
+    AST.PatternVariable name            -> [name]
+    AST.PatternMutableVariable name     -> [name]
+    AST.PatternIgnore                   -> []
+    AST.PatternTuple pattern'           -> concat $ map namesInPattern pattern'
+  insertPattern' :: AST.Pattern -> AST.Type -> Env -> Either String Env
+  insertPattern' pattern valueType env = case pattern of
+    AST.PatternVariable name            -> return $ insertVariable name (Variable valueType False) env
+    AST.PatternMutableVariable name     -> return $ insertVariable name (Variable valueType True) env
+    AST.PatternIgnore                   -> return env
+    AST.PatternTuple pattern'           -> case valueType of
+      AST.Tuple types ->
+        let patternLength = length pattern' in
+        let typesLength = length types in
+        do
+          unless (patternLength == typesLength) $ throwError $ tupleLengthNotMatchMessage typesLength patternLength env
+          let pairs = zipWith insertPattern' pattern' types
+          foldl' (>=>) return pairs env
+      _ -> throwError $ couldNotMatchTypeWithTupleMessage valueType env
 
 pushSubpath :: String -> String -> Env -> Env
 pushSubpath nodeType name env = env { path = Path $ (nodeType, name) : oldPath} where
@@ -215,8 +230,9 @@ insertFunctions functions env =
 typeCheckFunction :: AST.FunctionDeclaration -> Env -> Either String ()
 typeCheckFunction fun env = do
         env <- return $ pushSubpath "function" (AST.name fun) env
-        let parameters' = map (\funParam -> insertPattern (AST.pattern funParam) (AST.valueType funParam)) $ AST.parameters fun
-        env' <- foldl' (>=>) return parameters' env
+        let bindingsAsTuple = AST.PatternTuple $ map AST.pattern $ AST.parameters fun
+        let parametersAsTuple = AST.Tuple $ map AST.valueType $ AST.parameters fun
+        env' <- insertPattern bindingsAsTuple parametersAsTuple env
         blockType <- typeCheckBlock (AST.body fun) env'
         let resultType = AST.resultType fun
         assertTypesEqual blockType resultType env
