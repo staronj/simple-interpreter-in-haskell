@@ -5,7 +5,7 @@
 module Compile (compile, execute) where
 
 import Data.Int (Int32)
-import Data.List (foldl')
+import Data.List (foldl', uncons)
 import Data.Maybe (fromMaybe)
 import Control.Monad
 import Control.Monad.Except (throwError)
@@ -83,6 +83,9 @@ type Program = Continuation
 range :: (Enum a, Ord a) => a -> a -> [a]
 range begin end = takeWhile (< end) [begin ..]
 
+lazyFixpoint :: Monad m => (a -> m a) -> (a -> m a)
+lazyFixpoint f a = f a >>= lazyFixpoint f
+
 readMemory :: MemoryAddress -> State -> Int32
 readMemory address state =
   let Memory m = memory state in
@@ -151,11 +154,11 @@ initialFEnv = Map.fromList [
   ] where
   readI32 :: Continuation
   readI32 state =
-    let callAddress = callPointer state in
-    let value : input' = input state in
-    let state' = state { input = input' } in
-    let state'' = writeMemory callAddress value state' in
-    return (state'', callAddress)
+    let callAddress = callPointer state in do
+      (value, input') <- fromMaybe (throwError ("Runtime error: end of input.", state)) (fmap return $ uncons $ input state)
+      let state' = state { input = input' }
+      let state'' = writeMemory callAddress value state'
+      return (state'', callAddress)
   writeI32 :: Continuation
   writeI32 state =
     let callAddress = callPointer state in
@@ -416,6 +419,28 @@ compileExpr env offset expr state =
             let action = foldl' (>=>) return actions
             state <- action state
             return (state, stackPointer)
+        Imd.ForEach name initExpr ->
+          -- First, we call initExpr on offset = offset + sizeOf initExpr.
+          -- Next, we copy initExpr to offset.
+          -- Next, we call block specific number of times with different
+          -- enviroments and offset = offset + sizeOf initExpr.
+          let initType = typeOf initExpr in
+          let initSize = sizeOf initType in
+          let (AST.Array elementType elementsCount) = initType in
+          let elementSize = sizeOf elementType in
+          let initCont = compileExpr env (offset + initSize) initExpr in
+          -- Block must be compiled with enviroment containing for variable.
+          let forVariableOffsets = map (\i -> offset + MemoryOffset i * elementSize) $ range 0 elementsCount in
+          let blockEnvs = map
+                            (\offset -> insertVariable name (Variable offset) env)
+                            forVariableOffsets in
+          let blockConts = map (\env' -> compileExpr env' (offset + initSize) block) blockEnvs in
+          let blockConts' = map (>=> (return . fst)) blockConts in
+          let blockCont = foldl' (>=>) return blockConts' in do
+            (state, arrayAddress) <- initCont state
+            state <- return $ copyMemory initSize arrayAddress stackPointer state
+            state <- blockCont state
+            return (state, stackPointer)
         Imd.While conditionExpr ->
           -- Alternately run contirionExpr and block on offset = offset
           let conditionCont = compileExpr env offset conditionExpr in
@@ -426,7 +451,13 @@ compileExpr env offset expr state =
           let loop = loopIteration >=> ifConditionThenCall loop in do
             state <- (conditionCheck >=> ifConditionThenCall loop) state
             return (state, stackPointer)
-        _ -> error "Not implented."
+        Imd.Forever ->
+          -- Just run block forever (till break) on offset = offset
+          let blockCont = compileExpr env offset block in
+          let loopIteration = blockCont >=> return . fst in
+          do
+            state <- lazyFixpoint loopIteration state
+            return (state, stackPointer)
     Imd.FlowControl   _         -> undefined
     Imd.BindVariables bindings initExpr suffixExpr ->
       -- Run initExpr on offset = (offset + sizeOf initExpr), copy
@@ -467,5 +498,5 @@ execute program input =
   let emptyMemory = Memory Map.empty in
   let state = State input Nil emptyMemory (MemoryAddress 0) in
   case program  state of
-    Right (state, _) -> memory state `seq` Right $ output state
-    Left (message, state) -> memory state `seq` Left (message, output state)
+    Right (state, _) -> Right $ output state
+    Left (message, state) -> Left (message, output state)

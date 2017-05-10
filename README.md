@@ -17,3 +17,11 @@ interpreter examples/hello_world.rc
 Unit tests for grammar can be found in file *GrammarUnitTests.hs*. Unit tests for type checking phase can be fount in file *TypeCheckUnitTests.hs*. Please consider unit tests located in that file as part of code examples, especially *should-fail* tests - examples of mailformed programs.
 
 To run the tests please run ```make tests```.
+
+#### Todo
+* Fix problem with interleaving streams (output appears only after whole program executes)
+* Allow pattern instead of name in IterableForLoop.
+* Implement break and continue in compilation part.
+* Implement typecheck for Borrowing, MutableBorrowing and Dereference.
+* Implement Intermediate representation building for above.
+* Implement compilation part of above.

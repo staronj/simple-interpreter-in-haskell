@@ -1,0 +1,6 @@
+fn main() {
+  loop {
+    let a = readI32();
+    writeI32(a)
+  }
+}

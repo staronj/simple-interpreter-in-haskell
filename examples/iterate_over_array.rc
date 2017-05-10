@@ -1,0 +1,12 @@
+fn main() {
+  let mut arr = [0; 5];
+  for i in 0..5 {
+    arr[i] = readI32();
+  }
+
+  let mut result = 1;
+  for e in arr {
+    result = result * e;
+  }
+  writeI32(result)
+}

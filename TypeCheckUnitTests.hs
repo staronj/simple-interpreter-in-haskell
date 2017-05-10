@@ -254,6 +254,9 @@ tests =
   test False "iterable-for-loop-wrong-block-type"
     "fn main() { for x in [1, 2, 3] { 42 } }",
 
+  test False "iterable-for-loop-wrong-init-type"
+    "fn main() { for x in 42 { } }",
+
   test True "negation-minimal-example"
     "fn main() { -1; }",
 

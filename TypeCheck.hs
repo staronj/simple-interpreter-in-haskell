@@ -134,7 +134,7 @@ insertPattern pattern valueType env = do
     AST.PatternVariable name            -> [name]
     AST.PatternMutableVariable name     -> [name]
     AST.PatternIgnore                   -> []
-    AST.PatternTuple pattern'           -> concat $ map namesInPattern pattern'
+    AST.PatternTuple pattern'           -> concatMap namesInPattern pattern'
   insertPattern' :: AST.Pattern -> AST.Type -> Env -> Either String Env
   insertPattern' pattern valueType env = case pattern of
     AST.PatternVariable name            -> return $ insertVariable name (Variable valueType False) env

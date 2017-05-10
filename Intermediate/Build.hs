@@ -8,10 +8,7 @@ import Data.Int (Int32)
 import Data.List (foldl', uncons)
 import Data.Maybe (fromMaybe)
 import Control.Exception.Base (assert)
-import Control.Monad (void)
 import Control.Monad.Writer.Strict (Writer, runWriter, tell)
-
-import Debug.Trace (trace)
 
 import Intermediate
 import FormatString (format)
@@ -197,7 +194,14 @@ fromStmt env stmt suffix =
       block <- fromBlock env block
       let loop = Loop (fromWhateverExpr While condExpr) block
       return $ Sequence loop compiledSuffix
-    AST.IterableForLoop name initExpr block     -> undefined
+    AST.IterableForLoop name initExpr block     -> do
+      initExpr <- fromExpr env initExpr
+      let initType = typeOf initExpr
+      let (AST.Array elementType _) = initType
+      env <- return $ insertVariable name Variable { variableType = elementType, path = [] } env
+      block <- fromBlock env block
+      let loop = Loop (fromWhateverExpr (ForEach name) initExpr) block
+      return $ Sequence loop compiledSuffix
     AST.RangeForLoop name beginExpr endExpr block       -> do
       beginExpr <- buildRValueExpr <$> fromExpr env beginExpr
       endExpr <- buildRValueExpr <$> fromExpr env endExpr
