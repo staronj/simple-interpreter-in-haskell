@@ -4,9 +4,8 @@
 
 module RList where
 
-import Data.Functor
-import Data.Foldable
-import Data.Monoid
+import Data.Functor (Functor)
+import Data.Foldable (Foldable, toList)
 import Data.List (intercalate)
 import FormatString (format)
 
