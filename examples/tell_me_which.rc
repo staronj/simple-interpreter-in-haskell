@@ -1,0 +1,12 @@
+// Jakub Staroń, 2017
+
+fn main() {
+  let tuple = (readI32(), readI32());
+  let i = readI32();
+  if i == 0 {
+    writeI32(tuple.0);
+  }
+  if i == 1 {
+    writeI32(tuple.1);
+  }
+}

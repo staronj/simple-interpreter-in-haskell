@@ -11,7 +11,7 @@ data ExprKind = LValue | RValue
 
 data Expr :: ExprKind -> * where
   FunctionCall ::   AST.Type -> AST.Ident -> Expr 'RValue -> Expr 'RValue
-  TupleLookup ::    Expr a -> Int32 -> Expr a
+  TupleLookup ::    Expr a -> Int32 -> Expr 'LValue
   ArrayLookup ::    Expr a -> Expr b -> Expr a
 
   Equal ::          Expr a -> Expr b -> Expr 'RValue

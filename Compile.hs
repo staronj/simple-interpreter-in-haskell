@@ -13,7 +13,6 @@ import Control.Exception.Base (assert)
 
 import qualified Debug.Trace as Debug
 
-
 import qualified Data.Map.Lazy as Map
 import qualified Data.Map.Strict as MapStrict
 
@@ -250,7 +249,14 @@ compileExpr env offset expr state =
         -- Recover old call address
         state <- return $ state { callPointer = callAddress }
         return (state, resultAddress)
-    Imd.TupleLookup   _ _       -> undefined
+    Imd.TupleLookup   tupleExpr index ->
+      let tupleType = typeOf tupleExpr in
+      let elementOffset = offsetInTuple tupleType [index] in
+      -- Let's just call tupleExpr on offset = offset and return
+      -- appropriate address.
+      let tupleCont = compileExpr env offset tupleExpr in do
+        (state, tupleAddress) <- tupleCont state
+        return (state, tupleAddress |+ elementOffset)
     Imd.ArrayLookup   arrayExpr indexExpr ->
       let arrayType = typeOf arrayExpr in
       let AST.Array elementType arrayLength = arrayType in
@@ -458,7 +464,7 @@ compileExpr env offset expr state =
           do
             state <- lazyFixpoint loopIteration state
             return (state, stackPointer)
-    Imd.FlowControl   _         -> undefined
+    Imd.FlowControl   _         -> error "Not implemented."
     Imd.BindVariables bindings initExpr suffixExpr ->
       -- Run initExpr on offset = (offset + sizeOf initExpr), copy
       -- resulting variable to  offset, run suffixExpr with
@@ -491,12 +497,12 @@ offsetInTuple (AST.Tuple types) (n : ns) =
   let sizes = map sizeOf types in
   let nn = fromIntegral n in
   sum (take nn sizes) + offsetInTuple (types !! nn) ns
-offsetInTuple _ _ = undefined
+offsetInTuple _ _ = error "Internal interpreter error: offsetInTuple argument is not a tuple!"
 
-execute :: Program -> Input -> Either (String, Output) Output
+execute :: Program -> Input -> (Output, Maybe String)
 execute program input =
   let emptyMemory = Memory Map.empty in
   let state = State input Nil emptyMemory (MemoryAddress 0) in
   case program  state of
-    Right (state, _) -> Right $ output state
-    Left (message, state) -> Left (message, output state)
+    Right (state, _) -> (output state, Nothing)
+    Left (message, state) -> (output state, Just message)

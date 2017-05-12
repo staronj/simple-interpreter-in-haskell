@@ -17,7 +17,6 @@ import TypeCheck (typeCheck)
 import Compile (compile, execute)
 import qualified Intermediate.Build as Intermediate
 
-
 data Options = Options
  { optVerbose     :: Bool
  , optDumpAst        :: Bool
@@ -28,29 +27,6 @@ defaultOptions    = Options
  { optVerbose     = False
  , optDumpAst     = False
  }
-
-{-
-options :: [Opt.OptDescr (Options -> Options)]
-options =
- [ Opt.Option ['v']     ["verbose"]
-     (Opt.NoArg (\ opts -> opts { optVerbose = True }))
-     "chatty output on stderr"
- , Opt.Option ['V','?'] ["version"]
-     (Opt.NoArg (\ opts -> opts { optShowVersion = True }))
-     "show version number"
- , Opt.Option ['o']     ["output"]
-     (Opt.OptArg ((\ f opts -> opts { optOutput = Just f }) . fromMaybe "output")
-             "FILE")
-     "output FILE"
- , Opt.Option ['c']     []
-     (Opt.OptArg ((\ f opts -> opts { optInput = Just f }) . fromMaybe "input")
-             "FILE")
-     "input FILE"
- , Opt.Option ['L']     ["libdir"]
-     (Opt.ReqArg (\ d opts -> opts { optLibDirs = optLibDirs opts ++ [d] }) "DIR")
-     "library directory"
- ]
--}
 
 options :: [Opt.OptDescr (Options -> Options)]
 options =
@@ -91,6 +67,5 @@ main = fmap (fromMaybe ()) $ runMaybeT $ do
   input <- liftIO $ fmap (map read . lines) getContents
   when (optVerbose options) $ liftIO $ putStrLn "Executing."
   let output = execute program input
-  case output of
-    Right output -> liftIO $ mapM_ print output
-    Left (err, output) -> liftIO $ mapM_ print output >> print err
+  liftIO $ mapM_ print (fst output)
+  liftIO $ maybe (return ()) print (snd output)

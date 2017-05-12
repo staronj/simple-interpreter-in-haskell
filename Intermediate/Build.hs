@@ -184,7 +184,9 @@ fromStmt env stmt suffix =
     AST.Stmt expr                               -> do
       expr <- fromExpr env expr
       return $ fromWhateverExpr Sequence expr compiledSuffix
-    AST.StrictStmt expr                         -> undefined
+    AST.StrictStmt expr                         -> do
+      expr <- fromExpr env expr
+      return $ fromWhateverExpr Sequence expr compiledSuffix
     AST.Loop block                              -> do
       block <- fromBlock env block
       let loop = Loop Forever block
@@ -251,21 +253,23 @@ fromExpr env expr = case expr of
     arrayExpr <- fromExpr env arrayExpr
     indexExpr <- fromExpr env indexExpr
     return $ fromWhateverExpr_ (fromWhateverExpr (flip ArrayLookup) indexExpr) arrayExpr
-  AST.Dereference expr                    -> undefined
-  AST.Borrow expr                         -> undefined
-  AST.MutableBorrow expr                  -> undefined
+  AST.Dereference expr                    -> error "Not implemented."
+  AST.Borrow expr                         -> error "Not implemented."
+  AST.MutableBorrow expr                  -> error "Not implemented."
   AST.LiteralExpr     literal             -> return $ Right $ Literal literal
   AST.FunctionCall    ident exprs         -> do
     exprs <- mapM (fromExpr env) exprs
     exprs <- return $ map buildRValueExpr exprs
     let function = findFunction env ident
     return $ toHeteromorphic $ FunctionCall (resultType function) (uid function) $ Tuple exprs
-  AST.TupleLookup     tupleExpr count     -> undefined
-  AST.ArrayElements   exprs               -> undefined
+  AST.TupleLookup     tupleExpr index     -> do
+    tupleExpr <- fromExpr env tupleExpr
+    return $ toHeteromorphic $ fromWhateverExpr (flip TupleLookup index) tupleExpr
+  AST.ArrayElements   exprs               -> error "Not implemented."
   AST.ArrayRepeat     initExpr count      -> do
     initExpr <- buildRValueExpr <$> fromExpr env initExpr
     return $ toHeteromorphic $ Array $ Repeat initExpr count
-  AST.ArrayRange      begin end           -> undefined
+  AST.ArrayRange      begin end           -> error "Not implemented."
   AST.TupleConstruct  exprs               -> do
     exprs <- mapM (fromExpr env) exprs
     exprs <- return $ map buildRValueExpr exprs
