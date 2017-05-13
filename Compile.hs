@@ -18,9 +18,10 @@ import qualified Data.Map.Strict as MapStrict
 
 import qualified AST
 import qualified Intermediate as Imd
+import Common (range, internalError)
 import Intermediate (typeOf)
 import RList
-import FormatString
+import FormatString (format)
 
 -- Debugging
 debugMode :: Bool
@@ -78,10 +79,6 @@ data Env = Env {functions :: FEnv, variables :: VEnv}
 
 type Program = Continuation
 
--- Close-open range (cause' Haskell [a..b] sucks.)
-range :: (Enum a, Ord a) => a -> a -> [a]
-range begin end = takeWhile (< end) [begin ..]
-
 lazyFixpoint :: Monad m => (a -> m a) -> (a -> m a)
 lazyFixpoint f a = f a >>= lazyFixpoint f
 
@@ -89,7 +86,7 @@ readMemory :: MemoryAddress -> State -> Int32
 readMemory address state =
   let Memory m = memory state in
     fromMaybe
-    (error $ format "Internal interpreter error: value not found under given adress.\nAddress: %0, call pointer: %1." [show address, show $ callPointer state])
+    (internalError $ format "value not found under given adress.\nAddress: %0, call pointer: %1." [show address, show $ callPointer state])
     (MapStrict.lookup address m)
 
 writeMemory :: MemoryAddress -> Int32 -> State -> State
@@ -127,13 +124,13 @@ equalMemory size first second state = all (uncurry (==)) pairs where
 findFunction :: AST.Ident -> Env -> Function
 findFunction ident env =
   fromMaybe
-  (error $ format "Internal interpreter error: function \"%0\" not found." [ident])
+  (internalError $ format "function \"%0\" not found." [ident])
   (Map.lookup ident $ functions env)
 
 findVariable :: AST.Ident -> Env -> Variable
 findVariable ident env =
     fromMaybe
-    (error $ format "Internal interpreter error: variable \"%0\" not found.\nVariables: %1" [ident, show $ variables env])
+    (internalError $ format "variable \"%0\" not found.\nVariables: %1" [ident, show $ variables env])
     (Map.lookup ident $ variables env)
 
 initialFEnv :: FEnv
@@ -497,7 +494,7 @@ offsetInTuple (AST.Tuple types) (n : ns) =
   let sizes = map sizeOf types in
   let nn = fromIntegral n in
   sum (take nn sizes) + offsetInTuple (types !! nn) ns
-offsetInTuple _ _ = error "Internal interpreter error: offsetInTuple argument is not a tuple!"
+offsetInTuple _ _ = internalError "offsetInTuple argument is not a tuple!"
 
 execute :: Program -> Input -> (Output, Maybe String)
 execute program input =

@@ -12,6 +12,7 @@ import Control.Monad.Writer.Strict (Writer, runWriter, tell)
 
 import Intermediate
 import FormatString (format)
+import Common (internalError)
 import qualified AST
 import qualified Data.Map.Strict as Map
 
@@ -87,9 +88,6 @@ fromAST program = Program { functions = fs, mainUid = u } where
   (env, fs) = runIntermediateBuilder $ fromProgram program
   u = uid $ findFunction env "main"
 
-enumerate :: [a] -> [(a, Int)]
-enumerate = flip zip [0..]
-
 addFunctionEntry :: Env -> AST.FunctionDeclaration -> Env
 addFunctionEntry env function = env { functionEntries = Map.insert (AST.name function) entry (functionEntries env) } where
   entry = FunctionEntry { uid = format "%0#%1" [AST.name function, show $ functionCounter env], resultType = AST.resultType function }
@@ -97,13 +95,13 @@ addFunctionEntry env function = env { functionEntries = Map.insert (AST.name fun
 findFunction :: Env -> AST.Ident -> FunctionEntry
 findFunction env name =
   fromMaybe
-  (error $ format "Internal interpreter error: function \"%0\" not found." [name])
+  (internalError $ format "function \"%0\" not found." [name])
   (Map.lookup name $ functionEntries env)
 
 findVariable :: Env -> AST.Ident -> Variable
 findVariable env name =
   fromMaybe
-  (error $ format "Internal interpreter error: variable \"%0\" not found." [name])
+  (internalError $ format "variable \"%0\" not found." [name])
   (Map.lookup name $ variables env)
 
 insertFunctions :: Env -> [AST.FunctionDeclaration] -> IntermediateBuilder Env

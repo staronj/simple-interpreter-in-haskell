@@ -6,10 +6,10 @@ import Data.List (foldl', intercalate)
 import Control.Monad
 import Control.Monad.Except (throwError)
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 
 import qualified AST
 import FormatString (format)
+import Common (maybeToEither, findDuplicate, internalError)
 
 -- Information about variable needed
 -- for type check.
@@ -43,14 +43,6 @@ data Env =
   , path :: Path
   , inLoop :: Bool }
 
-maybeToEither :: b -> Maybe a -> Either b a
-maybeToEither = flip maybe Right . Left
-
-findDuplicate :: Ord a => [a] -> Maybe a
-findDuplicate = either Just (const Nothing) . foldM insert Set.empty where
-  insert :: Ord a => Set.Set a -> a -> Either a (Set.Set a)
-  insert s x = if Set.member x s then Left x else Right $ Set.insert x s
-
 -- Messages
 functionNotFoundMessage :: AST.Ident -> Env -> String
 functionNotFoundMessage name env = format "cannot find function `%0` in scope\n%1" [name, show $ path env]
@@ -75,6 +67,9 @@ expectedArrayMessage valueType env = format "expected array, not a value of type
 
 expectedTupleMessage :: AST.Type -> Env -> String
 expectedTupleMessage valueType env = format "expected tuple, not a value of type '%0'\nat%1" [show valueType, show $ path env]
+
+expectedReferenceMessage :: AST.Type -> Env -> String
+expectedReferenceMessage valueType env = format "expected reference, not a value of type '%0'\nat%1" [show valueType, show $ path env]
 
 invalidNumberOfArgumentsMessage :: (Num a, Show a) => AST.Ident -> a -> a -> Env -> String
 invalidNumberOfArgumentsMessage name expected got env = format "function '%0': expected %1 arguments, got %2\at%3" [name, show expected, show got, show $ path env]
@@ -188,6 +183,12 @@ assertFunctionArguments function ident types env =
 
 assertInLoop :: Env -> Either String ()
 assertInLoop env = unless (inLoop env) $ throwError $ controlFlowStmtOutsideOfLoopMessage env
+
+assertIsReference :: AST.Type -> Env -> Either String ()
+assertIsReference valueType env = case valueType of
+  AST.Reference _         -> return ()
+  AST.MutableReference _  -> return ()
+  _                       -> throwError $ expectedReferenceMessage valueType env
 -- Assertions end
 
 initialEnv :: Env
@@ -382,7 +383,7 @@ typeCheckExpr expr env = case expr of
     AST.ArrayElements   exprs               -> do
         exprs <- mapM (`typeCheckExpr` env) exprs
         exprs <- return $ map varType exprs
-        when (null exprs) $ error "Internal interpreter error: empty exprs list in AST.ArrayElements."
+        when (null exprs) $ internalError "empty exprs list in AST.ArrayElements."
         let commonType = head exprs
         mapM_ (flip (assertTypesEqual commonType) env) exprs
         return $ Variable (AST.Array commonType $ fromIntegral $ length exprs) False
